@@ -1,50 +1,49 @@
-// src/components/TopUpForm.tsx
-import { useState } from 'react';
+import React, { useState } from 'react'
+import { apiFetch } from '../api/client'
 
-interface Props { onSuccess: (bal: number) => void; }
+interface Props {
+  onSuccess: (bal: number) => void
+}
 
 export function TopUpForm({ onSuccess }: Props) {
-  const [amt, setAmt] = useState('');
-  const [loading, setLoading] = useState(false);
-  const token = localStorage.getItem('token') || '';
+  const [amount, setAmount] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const value = +amt;
-    if (!value || value <= 0) return alert('Введите сумму');
-    setLoading(true);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const value = +amount
+    if (!value || value <= 0) return alert('Введите сумму > 0')
+    setLoading(true)
     try {
-      const res = await fetch(import.meta.env.VITE_API_URL + '/wallet/topup', {
+      const res = await apiFetch('/wallet/topup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token,
-        },
-        body: JSON.stringify({ amount: value }),
-      });
-      if (!res.ok) throw new Error();
-      const { balance } = await res.json();
-      onSuccess(balance);
-      setAmt('');
+        body: JSON.stringify({ amount: value })
+      })
+      if (!res.ok) throw new Error('Ошибка сервера')
+      const { balance } = await res.json()
+      onSuccess(balance)
+      setAmount('')
     } catch {
-      alert('Ошибка пополнения');
+      alert('Не удалось пополнить')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={onSubmit}>
+    <form className="form" onSubmit={handleSubmit}>
       <input
+        className="input"
         type="number"
+        min="1"
         placeholder="Сумма ₽"
-        value={amt}
-        onChange={e => setAmt(e.target.value)}
+        value={amount}
+        onChange={e => setAmount(e.target.value)}
         disabled={loading}
       />
-      <button disabled={loading}>{
-        loading ? '…' : 'Пополнить'
-      }</button>
+      <button className="button" disabled={loading}>
+        {loading ? '…' : 'Пополнить'}
+      </button>
     </form>
-  );
+  )
 }

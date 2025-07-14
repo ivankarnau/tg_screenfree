@@ -1,10 +1,8 @@
-// src/App.tsx
 import React, { useEffect, useState } from 'react'
 import { loginWithTelegram } from './api/auth'
 import { apiFetch } from './api/client'
 import { TopUpForm } from './components/TopUpForm'
 import { SonicControl } from './components/SonicControl'
-import './App.css'
 
 export default function App() {
   const [balance, setBalance] = useState<number | null>(null)
@@ -12,39 +10,36 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function bootstrap() {
-      setLoading(true)
+    ;(async () => {
       try {
-        // Telegram WebApp передаёт initData в query string
+        // 1) Логин через Telegram WebApp
         const params = new URLSearchParams(window.location.search)
         const initData = params.get('initData') || ''
-        if (!initData) throw new Error('Отсутствует initData от Telegram')
+        if (!initData) throw new Error('Нет initData от Telegram')
 
-        // Шлём initData на бэкенд — получаем и сохраняем JWT
         await loginWithTelegram(initData)
 
-        // Теперь запрашиваем баланс
+        // 2) Скрываем bottom MainButton, чтобы не дублировать баланс
+        window.Telegram.WebApp.MainButton.hide()
+
+        // 3) Запрашиваем баланс
         const res = await apiFetch('/wallet/balance')
-        if (!res.ok) {
-          throw new Error(`Ошибка при загрузке баланса: ${res.status}`)
-        }
-        const data = await res.json()
-        setBalance(data.balance)
+        if (!res.ok) throw new Error(`Ошибка при загрузке: ${res.status}`)
+        const { balance } = await res.json()
+        setBalance(balance)
       } catch (e: any) {
-        setError(e.message || 'Что-то пошло не так')
+        setError(e.message || 'Неизвестная ошибка')
       } finally {
         setLoading(false)
       }
-    }
-
-    bootstrap()
+    })()
   }, [])
 
   if (loading) {
     return (
       <div className="App">
-        <h1>ScreenFree Mini-App</h1>
-        <p>Загрузка…</p>
+        <h1 className="title">ScreenFree</h1>
+        <p className="info">Загрузка…</p>
       </div>
     )
   }
@@ -52,33 +47,36 @@ export default function App() {
   if (error) {
     return (
       <div className="App">
-        <h1>ScreenFree Mini-App</h1>
-        <p style={{ color: 'red' }}>Ошибка: {error}</p>
-        <footer>@screenfree_bot</footer>
+        <h1 className="title">ScreenFree</h1>
+        <p className="info error">Ошибка: {error}</p>
       </div>
     )
   }
 
   return (
     <div className="App">
-      <h1>ScreenFree Mini-App</h1>
+      <header className="header">
+        <h1 className="title">ScreenFree</h1>
+      </header>
 
-      <section>
-        <h2>Кошелёк</h2>
-        <p>
-          <strong>Баланс:</strong> {balance} ₽
-        </p>
-        <TopUpForm onSuccess={setBalance} />
-      </section>
+      <main>
+        <section className="card">
+          <h2 className="card-title">Кошелёк</h2>
+          <p className="balance">
+            {balance} ₽
+          </p>
+          <TopUpForm onSuccess={setBalance} />
+        </section>
 
-      <hr />
+        <section className="card">
+          <h2 className="card-title">Ультразвуковое измерение</h2>
+          <SonicControl />
+        </section>
+      </main>
 
-      <section>
-        <h2>Ультразвуковое измерение</h2>
-        <SonicControl />
-      </section>
-
-      <footer>@screenfree_bot</footer>
+      <footer className="footer">
+        @screenfree_bot
+      </footer>
     </div>
   )
 }

@@ -1,47 +1,69 @@
-// src/components/SonicControl.tsx
-import { useState } from 'react';
+import React, { useState } from 'react'
+import { apiFetch } from '../api/client'
 
 export function SonicControl() {
-  const [job, setJob] = useState('');
-  const [status, setStatus] = useState('');
-  const [res, setRes] = useState<any>(null);
-  const token = localStorage.getItem('token') || '';
-
-  const API = import.meta.env.VITE_API_URL;
+  const [job, setJob] = useState<string | null>(null)
+  const [status, setStatus] = useState<string>('')
+  const [result, setResult] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
 
   async function start() {
-    const r = await fetch(API + '/sonic/start', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    const { job_id } = await r.json();
-    setJob(job_id);
-    setStatus('pending');
+    setLoading(true)
+    const res = await apiFetch('/sonic/start', { method: 'POST' })
+    if (res.ok) {
+      const { job_id } = await res.json()
+      setJob(job_id)
+      setStatus('pending')
+    } else {
+      alert('Ошибка старта')
+    }
+    setLoading(false)
   }
+
   async function check() {
-    if (!job) return;
-    const r = await fetch(API + `/sonic/status?job_id=${job}`, {
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    const { status } = await r.json();
-    setStatus(status);
+    if (!job) return
+    setLoading(true)
+    const res = await apiFetch(`/sonic/status?job_id=${job}`)
+    if (res.ok) {
+      const { status } = await res.json()
+      setStatus(status)
+    } else {
+      alert('Не удалось получить статус')
+    }
+    setLoading(false)
   }
+
   async function getResult() {
-    if (status !== 'done') return;
-    const r = await fetch(API + `/sonic/result?job_id=${job}`, {
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    if (r.ok) setRes(await r.json());
+    if (status !== 'done' || !job) return
+    setLoading(true)
+    const res = await apiFetch(`/sonic/result?job_id=${job}`)
+    if (res.ok) {
+      setResult(await res.json())
+    } else {
+      alert('Результат не готов')
+    }
+    setLoading(false)
   }
 
   return (
-    <div style={{ marginTop: 20 }}>
-      <h2>Ультразвук</h2>
-      <button onClick={start}>Начать</button>
-      <button onClick={check} disabled={!job}>Статус</button>
-      <button onClick={getResult} disabled={status!=='done'}>Результат</button>
-      <p>Статус: {status}</p>
-      {res && <pre>{JSON.stringify(res, null,2)}</pre>}
+    <div className="sonic">
+      <div className="controls">
+        <button className="button" onClick={start} disabled={loading}>
+          Начать
+        </button>
+        <button className="button" onClick={check} disabled={!job || loading}>
+          Статус
+        </button>
+        <button className="button" onClick={getResult} disabled={status !== 'done' || loading}>
+          Результат
+        </button>
+      </div>
+      <p className="info">Статус: {status || '—'}</p>
+      {result && (
+        <pre className="result">
+          {JSON.stringify(result, null, 2)}
+        </pre>
+      )}
     </div>
-  );
+  )
 }
