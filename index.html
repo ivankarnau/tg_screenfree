@@ -10,37 +10,40 @@
 
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-</head>
 
-<body>
-  <h1>ScreenFree</h1>
-  <!-- Статических <p> больше не будет -->
-  <div id="status">…</div>
-  <div id="balance">Баланс: —</div>
-
+  <!-- Наш скрипт для авторизации + баланса -->
   <script>
     (async () => {
       const API = 'https://tgscreenfreegateway-production.up.railway.app';
-      const statusEl  = document.getElementById('status');
-      const balanceEl = document.getElementById('balance');
+      const root = document.getElementById('root');
+
+      // создаём status и balance элементы
+      const statusEl = document.createElement('div');
+      statusEl.id = 'status';
+      statusEl.textContent = '…';
+      root.before(statusEl);
+
+      const balanceEl = document.createElement('div');
+      balanceEl.id = 'balance';
+      balanceEl.textContent = 'Баланс: —';
+      statusEl.after(balanceEl);
 
       try {
         Telegram.WebApp.ready();
 
         // 1) Авторизация
         statusEl.textContent = 'Авторизация…';
-        // Telegram.WebApp.initData берётся автоматически
         const initData = Telegram.WebApp.initData;
         if (!initData) throw new Error('Нет initData');
 
         const authResp = await fetch(API + '/auth/telegram', {
           method: 'POST',
-          headers: {'Content-Type':'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initData }),
         });
         if (!authResp.ok) {
-          const err = await authResp.json().catch(()=>null);
-          throw new Error('Auth failed: '+ (err?.detail||authResp.status));
+          const err = await authResp.json().catch(() => null);
+          throw new Error('Auth failed: ' + (err?.detail || authResp.status));
         }
         const { access_token } = await authResp.json();
 
@@ -48,25 +51,31 @@
         statusEl.textContent = 'Получение баланса…';
         const balResp = await fetch(API + '/wallet/balance', {
           headers: {
-            'Content-Type':'application/json',
-            'Authorization': 'Bearer ' + access_token
-          }
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + access_token,
+          },
         });
         if (!balResp.ok) {
-          const err = await balResp.json().catch(()=>null);
-          throw new Error('Balance failed: '+ (err?.detail||balResp.status));
+          const err = await balResp.json().catch(() => null);
+          throw new Error('Balance failed: ' + (err?.detail || balResp.status));
         }
         const { balance } = await balResp.json();
 
         // 3) Вывод результата
-        statusEl.textContent  = 'Готово';
+        statusEl.textContent = 'Готово';
         balanceEl.textContent = 'Баланс: ' + balance;
       } catch (e) {
         console.error(e);
-        statusEl.textContent  = 'Ошибка';
+        statusEl.textContent = 'Ошибка';
         balanceEl.textContent = e.message;
       }
     })();
   </script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <!-- Это ваш React-скрипт, можно оставить или убрать, если юзаешь чистый HTML -->
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
