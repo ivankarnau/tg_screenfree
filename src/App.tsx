@@ -1,8 +1,11 @@
+// src/App.tsx
 import React, { useEffect, useState } from 'react'
 import { loginWithTelegram } from './api/auth'
 import { apiFetch } from './api/client'
 import { TopUpForm } from './components/TopUpForm'
 import { SonicControl } from './components/SonicControl'
+import { SonicTransfer } from './components/SonicTransfer'
+import './App.css'
 
 export default function App() {
   const [balance, setBalance] = useState<number | null>(null)
@@ -10,24 +13,24 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    ;(async () => {
+    async function bootstrap() {
       try {
         const tg = window.Telegram.WebApp
         tg.ready()
 
-        // 1) Получаем initData из Telegram WebApp SDK
+        // 1) Получаем initData
         const initData = tg.initData || ''
-        if (!initData) throw new Error('Нет initData от Telegram')
+        if (!initData) throw new Error('Отсутствует initData от Telegram')
 
-        // 2) Логинимся на бэке
+        // 2) Авторизуемся на бэке
         await loginWithTelegram(initData)
 
-        // 3) Прячем MainButton, чтобы не дублировать баланс
+        // 3) Скрываем основную кнопку Telegram
         tg.MainButton.hide()
 
         // 4) Запрашиваем баланс
         const res = await apiFetch('/wallet/balance')
-        if (!res.ok) throw new Error(`Ошибка при загрузке: ${res.status}`)
+        if (!res.ok) throw new Error(`Ошибка загрузки баланса: ${res.status}`)
         const { balance } = await res.json()
         setBalance(balance)
       } catch (e: any) {
@@ -35,7 +38,8 @@ export default function App() {
       } finally {
         setLoading(false)
       }
-    })()
+    }
+    bootstrap()
   }, [])
 
   if (loading) {
@@ -63,15 +67,23 @@ export default function App() {
       </header>
 
       <main>
+        {/* Секция 1: Кошелёк */}
         <section className="card">
           <h2 className="card-title">Кошелёк</h2>
           <p className="balance">{balance} ₽</p>
           <TopUpForm onSuccess={setBalance} />
         </section>
 
+        {/* Секция 2: Ультразвуковое измерение */}
         <section className="card">
           <h2 className="card-title">Ультразвуковое измерение</h2>
           <SonicControl />
+        </section>
+
+        {/* Секция 3: Ультразвуковой перевод */}
+        <section className="card">
+          <h2 className="card-title">Ультразвуковой перевод</h2>
+          <SonicTransfer onTransfer={setBalance} />
         </section>
       </main>
 
