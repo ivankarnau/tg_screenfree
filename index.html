@@ -1,15 +1,73 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ScreenFree Wallet</title>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>ScreenFree WebApp</title>
+  <script>
+    // URL вашего Gateway (из .env или из Railway)
+    const API_URL = 'https://tgscreenfreegateway-production.up.railway.app'
 
-    <!-- ОБЯЗАТЕЛЬНАЯ строка для Mini-App -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    // После загрузки страницы и инициализации WebApp
+    window.addEventListener('DOMContentLoaded', () => {
+      Telegram.WebApp.ready()
+      main()
+    })
+
+    async function main() {
+      const statusEl = document.getElementById('status')
+      const balEl = document.getElementById('balance')
+
+      try {
+        statusEl.textContent = '1. Авторизация...'
+
+        // Telegram.WebApp.initData даёт ровно то же, что и initData в query
+        const initData = Telegram.WebApp.initData 
+          || new URLSearchParams(location.search).get('initData')
+
+        if (!initData) {
+          throw new Error('initData не передано')
+        }
+
+        // POST /auth/telegram
+        const auth = await fetch(`${API_URL}/auth/telegram`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData }),
+        })
+        if (!auth.ok) throw new Error('Авторизация не удалась')
+        const { access_token } = await auth.json()
+
+        // Сохраняем токен
+        localStorage.setItem('token', access_token)
+
+        statusEl.textContent = '2. Получаем баланс...'
+
+        // GET /wallet/balance
+        const bal = await fetch(`${API_URL}/wallet/balance`, {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${access_token}`
+          }
+        })
+        if (!bal.ok) throw new Error(`Баланс: ${bal.status}`)
+        const { balance } = await bal.json()
+
+        statusEl.textContent = 'Готово'
+        balEl.textContent = balance.toString()
+
+      } catch (err) {
+        console.error(err)
+        statusEl.textContent = 'Ошибка: ' + err.message
+      }
+    }
+  </script>
+</head>
+<body style="font-family:sans-serif;padding:20px">
+  <h1>ScreenFree</h1>
+  <p id="status">…</p>
+  <p>Баланс: <strong id="balance">—</strong></p>
+  <footer style="margin-top:40px;font-size:0.8em;color:#666">
+    @screenfree_bot
+  </footer>
+</body>
 </html>
