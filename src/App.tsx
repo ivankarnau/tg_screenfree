@@ -19,23 +19,17 @@ export default function App() {
         const tg = window.Telegram.WebApp
         tg.ready()
 
-        // 1) Получаем initData
         const initData = tg.initData || ''
         if (!initData) throw new Error('Отсутствует initData от Telegram')
 
-        // 2) Авторизуемся на бэке
         await loginWithTelegram(initData)
-
-        // 3) Скрываем основную кнопку Telegram
         tg.MainButton.hide()
 
-        // 4) Запрашиваем баланс
         const res = await apiFetch('/wallet/balance')
-        if (!res.ok) throw new Error(`Ошибка загрузки баланса: ${res.status}`)
-        const { balance } = await res.json()
-        setBalance(balance)
+        if (!res.ok) throw new Error(`Ошибка: ${res.status}`)
+        setBalance((await res.json()).balance)
       } catch (e: any) {
-        setError(e.message || 'Неизвестная ошибка')
+        setError(e.message)
       } finally {
         setLoading(false)
       }
@@ -51,12 +45,11 @@ export default function App() {
       </div>
     )
   }
-
   if (error) {
     return (
       <div className="App">
         <h1 className="title">ScreenFree</h1>
-        <p className="info error">Ошибка: {error}</p>
+        <p className="info error">{error}</p>
       </div>
     )
   }
@@ -68,27 +61,21 @@ export default function App() {
       </header>
 
       <main>
-        {/* Секция 1: Кошелёк */}
+        {/* Кошелёк */}
         <section className="card">
           <h2 className="card-title">Кошелёк</h2>
-
-          {/* 1.1 Баланс и форма пополнения */}
-          <div style={{ marginBottom: 16 }}>
-            <p className="balance">{balance} ₽</p>
-            <TopUpForm onSuccess={setBalance} />
-          </div>
-
-          {/* 1.2 Список полученных токенов */}
+          <p className="balance">{balance} ₽</p>
+          <TopUpForm onSuccess={setBalance} />
           <TokenList />
         </section>
 
-        {/* Секция 2: Ультразвуковое измерение */}
+        {/* Ультразвуковое измерение */}
         <section className="card">
           <h2 className="card-title">Ультразвуковое измерение</h2>
           <SonicControl />
         </section>
 
-        {/* Секция 3: Ультразвуковой перевод */}
+        {/* Ультразвуковой перевод */}
         <section className="card">
           <h2 className="card-title">Ультразвуковой перевод</h2>
           <UltrasoundTransfer />
