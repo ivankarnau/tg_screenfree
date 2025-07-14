@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { loginWithTelegram } from './api/auth'
 import { apiFetch } from './api/client'
 import { TopUpForm } from './components/TopUpForm'
+import { TokenList } from './components/TokenList'
 import { SonicControl } from './components/SonicControl'
 import { UltrasoundTransfer } from './components/UltrasoundTransfer'
 import './App.css'
@@ -70,8 +71,15 @@ export default function App() {
         {/* Секция 1: Кошелёк */}
         <section className="card">
           <h2 className="card-title">Кошелёк</h2>
-          <p className="balance">{balance} ₽</p>
-          <TopUpForm onSuccess={setBalance} />
+
+          {/* 1.1 Баланс и форма пополнения */}
+          <div style={{ marginBottom: 16 }}>
+            <p className="balance">{balance} ₽</p>
+            <TopUpForm onSuccess={setBalance} />
+          </div>
+
+          {/* 1.2 Список полученных токенов */}
+          <TokenList />
         </section>
 
         {/* Секция 2: Ультразвуковое измерение */}
