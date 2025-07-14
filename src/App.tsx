@@ -1,20 +1,18 @@
-import { useEffect, useState } from 'react';
-import './App.css';
+import { useEffect } from 'react';
+import { loginWithTelegram } from './api/auth';
 
 function App() {
-  const [msg, setMsg] = useState('загружаю…');
-
   useEffect(() => {
-    fetch(import.meta.env.VITE_API_URL + '/ping')
-      .then(r => r.json())
-      .then(j => setMsg(j.pong))
-      .catch(e => setMsg('⚠ ' + e.message));
+    // @ts-ignore  – объект приходит из TG SDK
+    const Tele = window.Telegram?.WebApp;
+    if (Tele && !localStorage.getItem('token')) {
+      loginWithTelegram(Tele.initData).catch(console.error);
+    }
   }, []);
 
   return (
     <>
-      <h1>ScreenFree Wallet demo</h1>
-      <p>Backend says: {msg}</p>
+      {/* ваше приложение */}
     </>
   );
 }
