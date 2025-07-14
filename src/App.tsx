@@ -4,7 +4,7 @@ import { loginWithTelegram } from './api/auth'
 import { apiFetch } from './api/client'
 import { TopUpForm } from './components/TopUpForm'
 import { SonicControl } from './components/SonicControl'
-import { SonicTransfer } from './components/SonicTransfer'
+import { UltrasoundTransfer } from './components/UltrasoundTransfer'
 import './App.css'
 
 export default function App() {
@@ -83,7 +83,7 @@ export default function App() {
         {/* Секция 3: Ультразвуковой перевод */}
         <section className="card">
           <h2 className="card-title">Ультразвуковой перевод</h2>
-          <SonicTransfer onTransfer={setBalance} />
+          <UltrasoundTransfer />
         </section>
       </main>
 
