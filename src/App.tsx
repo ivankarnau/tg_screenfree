@@ -12,17 +12,20 @@ export default function App() {
   useEffect(() => {
     ;(async () => {
       try {
-        // 1) Логин через Telegram WebApp
-        const params = new URLSearchParams(window.location.search)
-        const initData = params.get('initData') || ''
+        const tg = window.Telegram.WebApp
+        tg.ready()
+
+        // 1) Получаем initData из Telegram WebApp SDK
+        const initData = tg.initData || ''
         if (!initData) throw new Error('Нет initData от Telegram')
 
+        // 2) Логинимся на бэке
         await loginWithTelegram(initData)
 
-        // 2) Скрываем bottom MainButton, чтобы не дублировать баланс
-        window.Telegram.WebApp.MainButton.hide()
+        // 3) Прячем MainButton, чтобы не дублировать баланс
+        tg.MainButton.hide()
 
-        // 3) Запрашиваем баланс
+        // 4) Запрашиваем баланс
         const res = await apiFetch('/wallet/balance')
         if (!res.ok) throw new Error(`Ошибка при загрузке: ${res.status}`)
         const { balance } = await res.json()
@@ -62,9 +65,7 @@ export default function App() {
       <main>
         <section className="card">
           <h2 className="card-title">Кошелёк</h2>
-          <p className="balance">
-            {balance} ₽
-          </p>
+          <p className="balance">{balance} ₽</p>
           <TopUpForm onSuccess={setBalance} />
         </section>
 
@@ -74,9 +75,7 @@ export default function App() {
         </section>
       </main>
 
-      <footer className="footer">
-        @screenfree_bot
-      </footer>
+      <footer className="footer">@screenfree_bot</footer>
     </div>
   )
 }
