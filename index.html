@@ -2,72 +2,71 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>ScreenFree WebApp</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <title>ScreenFree Wallet</title>
+
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+
+<body>
+  <h1>ScreenFree</h1>
+  <!-- Статических <p> больше не будет -->
+  <div id="status">…</div>
+  <div id="balance">Баланс: —</div>
+
   <script>
-    // URL вашего Gateway (из .env или из Railway)
-    const API_URL = 'https://tgscreenfreegateway-production.up.railway.app'
-
-    // После загрузки страницы и инициализации WebApp
-    window.addEventListener('DOMContentLoaded', () => {
-      Telegram.WebApp.ready()
-      main()
-    })
-
-    async function main() {
-      const statusEl = document.getElementById('status')
-      const balEl = document.getElementById('balance')
+    (async () => {
+      const API = 'https://tgscreenfreegateway-production.up.railway.app';
+      const statusEl  = document.getElementById('status');
+      const balanceEl = document.getElementById('balance');
 
       try {
-        statusEl.textContent = '1. Авторизация...'
+        Telegram.WebApp.ready();
 
-        // Telegram.WebApp.initData даёт ровно то же, что и initData в query
-        const initData = Telegram.WebApp.initData 
-          || new URLSearchParams(location.search).get('initData')
+        // 1) Авторизация
+        statusEl.textContent = 'Авторизация…';
+        // Telegram.WebApp.initData берётся автоматически
+        const initData = Telegram.WebApp.initData;
+        if (!initData) throw new Error('Нет initData');
 
-        if (!initData) {
-          throw new Error('initData не передано')
-        }
-
-        // POST /auth/telegram
-        const auth = await fetch(`${API_URL}/auth/telegram`, {
+        const authResp = await fetch(API + '/auth/telegram', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ initData }),
-        })
-        if (!auth.ok) throw new Error('Авторизация не удалась')
-        const { access_token } = await auth.json()
+        });
+        if (!authResp.ok) {
+          const err = await authResp.json().catch(()=>null);
+          throw new Error('Auth failed: '+ (err?.detail||authResp.status));
+        }
+        const { access_token } = await authResp.json();
 
-        // Сохраняем токен
-        localStorage.setItem('token', access_token)
-
-        statusEl.textContent = '2. Получаем баланс...'
-
-        // GET /wallet/balance
-        const bal = await fetch(`${API_URL}/wallet/balance`, {
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${access_token}`
+        // 2) Запрос баланса
+        statusEl.textContent = 'Получение баланса…';
+        const balResp = await fetch(API + '/wallet/balance', {
+          headers: {
+            'Content-Type':'application/json',
+            'Authorization': 'Bearer ' + access_token
           }
-        })
-        if (!bal.ok) throw new Error(`Баланс: ${bal.status}`)
-        const { balance } = await bal.json()
+        });
+        if (!balResp.ok) {
+          const err = await balResp.json().catch(()=>null);
+          throw new Error('Balance failed: '+ (err?.detail||balResp.status));
+        }
+        const { balance } = await balResp.json();
 
-        statusEl.textContent = 'Готово'
-        balEl.textContent = balance.toString()
-
-      } catch (err) {
-        console.error(err)
-        statusEl.textContent = 'Ошибка: ' + err.message
+        // 3) Вывод результата
+        statusEl.textContent  = 'Готово';
+        balanceEl.textContent = 'Баланс: ' + balance;
+      } catch (e) {
+        console.error(e);
+        statusEl.textContent  = 'Ошибка';
+        balanceEl.textContent = e.message;
       }
-    }
+    })();
   </script>
-</head>
-<body style="font-family:sans-serif;padding:20px">
-  <h1>ScreenFree</h1>
-  <p id="status">…</p>
-  <p>Баланс: <strong id="balance">—</strong></p>
-  <footer style="margin-top:40px;font-size:0.8em;color:#666">
-    @screenfree_bot
-  </footer>
 </body>
 </html>
