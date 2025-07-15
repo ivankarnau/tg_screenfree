@@ -1,42 +1,33 @@
-// src/App.tsx
 import React, { useEffect, useState } from 'react'
 import { loginWithTelegram } from './api/auth'
 import { apiFetch } from './api/client'
 import { TopUpForm } from './components/TopUpForm'
 import { IssueTokenForm } from './components/IssueTokenForm'
 import { TokenList } from './components/TokenList'
-import { SonicControl } from './components/SonicControl'
+import { SonicTransfer } from './components/SonicTransfer'
 import './App.css'
 
 export default function App() {
   const [available, setAvailable] = useState<number>(0)
   const [reserved, setReserved]   = useState<number>(0)
+  const [selectedToken, setSelectedToken] = useState<string|null>(null)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string|null>(null)
+  const [tokensChanged, setTokensChanged] = useState(0)
 
   useEffect(() => {
     ;(async () => {
       try {
-        // 1) получаем объект WebApp
         const tg = window.Telegram.WebApp
         tg.ready()
-
-        // 2) initData берём только оттуда
         const initData = tg.initData
         if (!initData) {
           throw new Error('Нет initData от Telegram — откройте мини-приложение через кнопку бота')
         }
-
-        // 3) Авторизуемся на бэке, сохраняем JWT
         await loginWithTelegram(initData)
-
-        // 4) Убираем дублирующую кноп­ку внизу
         tg.MainButton.hide()
-
-        // 5) Загрузим балансы
         await loadBalance()
       } catch (e: any) {
-        console.error('Bootstrap error:', e)
         setError(e.message)
       } finally {
         setLoading(false)
@@ -46,20 +37,20 @@ export default function App() {
 
   async function loadBalance() {
     const res = await apiFetch('/wallet/balance')
-    if (!res.ok) {
-      throw new Error(`Сервер вернул ${res.status}`)
+    if (res.ok) {
+      const data = await res.json()
+      setAvailable(data.available)
+      setReserved(data.reserved)
     }
-    const data = await res.json()
-    setAvailable(data.available)
-    setReserved(data.reserved)
   }
 
-  if (loading) {
-    return <LoadingScreen />
+  function reloadTokens() {
+    setTokensChanged(x => x + 1)
+    loadBalance()
   }
-  if (error) {
-    return <ErrorScreen message={error} />
-  }
+
+  if (loading) return <LoadingScreen />
+  if (error) return <ErrorScreen message={error} />
 
   return (
     <div className="App">
@@ -71,15 +62,16 @@ export default function App() {
       </section>
 
       <section className="card">
-        <h2>Токены P2P (UltraSonic)</h2>
-        <IssueTokenForm onSuccess={loadBalance} />
-        <TokenList />
+        <h2>Ваши токены</h2>
+        <IssueTokenForm onSuccess={reloadTokens} />
+        <TokenList
+          selected={selectedToken}
+          onSelect={setSelectedToken}
+          key={tokensChanged} // Обновлять после новых токенов
+        />
       </section>
 
-      <section className="card">
-        <h2>Ультразвук</h2>
-        <SonicControl />
-      </section>
+      <SonicTransfer tokenId={selectedToken} onSuccess={reloadTokens} />
     </div>
   )
 }

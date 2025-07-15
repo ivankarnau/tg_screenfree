@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { apiFetch } from '../api/client'
 
-type Props = { onSuccess: ()=>Promise<void> }
+type Props = { onSuccess: () => void }
 
 export function IssueTokenForm({ onSuccess }: Props) {
   const [amount, setAmount] = useState('')
@@ -12,14 +12,11 @@ export function IssueTokenForm({ onSuccess }: Props) {
     if (!v || v <= 0) return alert('Введите сумму > 0')
     setLoading(true)
     try {
-      const res = await apiFetch('/bank/issuance',{
-        method:'POST', body: JSON.stringify({ amount: v })
+      const res = await apiFetch('/wallet/reserve', {
+        method: 'POST',
+        body: JSON.stringify({ amount: v })
       })
       if (!res.ok) throw new Error()
-      const { token } = await res.json()
-      await apiFetch('/wallet/reserve',{
-        method:'POST', body: JSON.stringify({ token, amount: v })
-      })
       await onSuccess()
       setAmount('')
     } catch {
@@ -35,7 +32,7 @@ export function IssueTokenForm({ onSuccess }: Props) {
         type="number"
         placeholder="Сумма ₽"
         value={amount}
-        onChange={e=>setAmount(e.target.value)}
+        onChange={e => setAmount(e.target.value)}
         disabled={loading}
       />
       <button disabled={loading} onClick={issue}>
