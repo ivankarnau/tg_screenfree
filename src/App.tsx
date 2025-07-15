@@ -170,6 +170,32 @@ export default function App() {
         />
       </section>
       <SonicTransfer tokenId={selectedToken} amount={selectedAmount} onSuccess={reloadTokens} />
+      <section className="card" style={{ marginTop: 32 }}>
+        <h2>История токенов</h2>
+        <TokenHistory tokens={tokens} />
+      </section>
+    </div>
+  )
+}
+
+function TokenHistory({ tokens }: { tokens: any[] }) {
+  return (
+    <div>
+      <ul style={{ paddingLeft: 0, margin: 0 }}>
+        {tokens.map(t => (
+          <li key={t.token_id} style={{ marginBottom: 8, fontSize: "0.98em", listStyle: "none", borderBottom: "1px solid #eee", paddingBottom: 7 }}>
+            <span>
+              <b>{t.amount} ₽</b> — <small>{t.token_id.slice(0, 8)}…</small>
+            </span>
+            <br />
+            <small>Создан: {new Date(t.created_at).toLocaleString()}</small>
+            {t.redeemed_at && <>
+              <br />
+              <small style={{ color: "#1976d2" }}>Погашен: {new Date(t.redeemed_at).toLocaleString()}</small>
+            </>}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

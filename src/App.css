@@ -14,22 +14,22 @@ body {
   color: #222;
 }
 .App {
-  max-width: 420px;
+  max-width: 430px;
   margin: 0 auto;
-  padding: 18px 6px 32px 6px;
+  padding: 22px 8px 38px 8px;
   min-height: 100vh;
 }
 .card {
   background: var(--card);
   border-radius: var(--radius);
-  padding: 22px 18px 18px 18px;
+  padding: 24px 18px 19px 18px;
   margin-bottom: 18px;
   box-shadow: var(--shadow);
   transition: box-shadow .15s;
 }
 .card h2 {
   font-size: 1.16em;
-  margin-bottom: 10px;
+  margin-bottom: 11px;
   color: var(--main);
   font-weight: 600;
   letter-spacing: .02em;
