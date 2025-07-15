@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 declare global {
   interface Window { Quiet: any }
@@ -7,7 +7,7 @@ declare global {
 type Props = {
   tokenId: string | null,
   amount: number | null,
-  onSuccess: () => void
+  onSuccess?: (receivedToken?: any) => void
 };
 
 export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
@@ -15,9 +15,25 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   const [status, setStatus] = useState('');
   const txRef = useRef<any>(null);
   const rxRef = useRef<any>(null);
+  const [ready, setReady] = useState(false);
 
-  // Передача токена ультразвуком
+  // Инициализация Quiet.js 1 раз
+  useEffect(() => {
+    if (window.Quiet && !ready) {
+      window.Quiet.init({
+        profilesPrefix: "/quiet/",
+        memoryInitializerPrefix: "/quiet/"
+      });
+      window.Quiet.addReadyCallback(
+        () => setReady(true),
+        (e: any) => setStatus("Quiet.js error: " + e)
+      );
+    }
+  }, [ready]);
+
+  // Передача токена
   function transmitToken() {
+    if (!ready) { setStatus("Quiet.js не готов"); return; }
     if (!tokenId || !amount) {
       setStatus('Выберите токен для передачи');
       setMode('error');
@@ -25,68 +41,54 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     }
     setMode('send');
     setStatus('Передача токена ультразвуком...');
-    window.Quiet.init({
-      profilesPrefix: "./",
-      memoryInitializerPrefix: "./",
-      onReady: () => {
-        txRef.current = window.Quiet.transmitter({
-          profile: 'ultrasonic', // или 'ultrasonic-fsk'
-          onFinish: () => {
-            setStatus('Передача завершена!');
-            setMode('done');
-            txRef.current?.destroy();
-            onSuccess?.();
-          }
-        });
-        const payload = JSON.stringify({ token_id: tokenId, amount });
-        txRef.current.transmit(window.Quiet.str2ab(payload));
-        // Можно добавить таймер для красоты:
-        setTimeout(() => {
-          txRef.current?.destroy();
-          setStatus('Передача завершена!');
-          setMode('done');
-          onSuccess?.();
-        }, 7000);
+    txRef.current = window.Quiet.transmitter({
+      profile: 'ultrasonic2', // или 'ultrasonic' — см. quiet-profiles.json
+      onFinish: () => {
+        setStatus('Передача завершена!');
+        setMode('done');
+        txRef.current?.destroy();
+        onSuccess?.();
       }
     });
+    const payload = JSON.stringify({ token_id: tokenId, amount });
+    txRef.current.transmit(window.Quiet.str2ab(payload));
+    setTimeout(() => {
+      txRef.current?.destroy();
+      setStatus('Передача завершена!');
+      setMode('done');
+      onSuccess?.();
+    }, 7000);
   }
 
-  // Приём токена ультразвуком
+  // Приём токена
   function receiveToken() {
+    if (!ready) { setStatus("Quiet.js не готов"); return; }
     setMode('receive');
     setStatus('Слушаем ультразвук...');
-    window.Quiet.init({
-      profilesPrefix: "./",
-      memoryInitializerPrefix: "./",
-      onReady: () => {
-        rxRef.current = window.Quiet.receiver({
-          profile: 'ultrasonic',
-          onReceive: (buf: ArrayBuffer) => {
-            try {
-              const str = window.Quiet.ab2str(buf);
-              const data = JSON.parse(str);
-              setStatus(`Токен получен: ${data.amount}₽`);
-              setMode('done');
-              rxRef.current?.destroy();
-              // Вызов claim можно сделать здесь или отдельной кнопкой
-              onSuccess?.();
-            } catch {
-              setStatus("Ошибка декодирования");
-              setMode('error');
-              rxRef.current?.destroy();
-            }
-          }
-        });
-        // Остановить через 12 секунд если не получили:
-        setTimeout(() => {
-          if (mode === 'receive') {
-            rxRef.current?.destroy();
-            setStatus('Время ожидания истекло');
-            setMode('idle');
-          }
-        }, 12000);
+    rxRef.current = window.Quiet.receiver({
+      profile: 'ultrasonic2',
+      onReceive: (buf: ArrayBuffer) => {
+        try {
+          const str = window.Quiet.ab2str(buf);
+          const data = JSON.parse(str);
+          setStatus(`Токен получен: ${data.amount}₽`);
+          setMode('done');
+          rxRef.current?.destroy();
+          onSuccess?.(data); // Вот сюда прокидываем токен!
+        } catch {
+          setStatus("Ошибка декодирования");
+          setMode('error');
+          rxRef.current?.destroy();
+        }
       }
     });
+    setTimeout(() => {
+      if (mode === 'receive') {
+        rxRef.current?.destroy();
+        setStatus('Время ожидания истекло');
+        setMode('idle');
+      }
+    }, 12000);
   }
 
   function stopAll() {
@@ -99,10 +101,11 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   return (
     <div className="card sonic">
       <h2>Передача токена ультразвуком</h2>
+      {!ready && <div className="info">Загрузка Quiet.js…</div>}
       {mode === 'idle' && (
         <div className="sonic-controls">
-          <button className="button" onClick={transmitToken} disabled={!tokenId}>Передать</button>
-          <button className="button" onClick={receiveToken}>Слушать</button>
+          <button className="button" onClick={transmitToken} disabled={!tokenId || !ready}>Передать</button>
+          <button className="button" onClick={receiveToken} disabled={!ready}>Слушать</button>
         </div>
       )}
       {(mode === 'send' || mode === 'receive') && (
