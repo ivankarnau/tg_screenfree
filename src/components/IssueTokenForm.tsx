@@ -1,31 +1,46 @@
 import React, { useState } from 'react'
 import { apiFetch } from '../api/client'
 
-export function IssueTokenForm({ onSuccess }: { onSuccess: ()=>void }) {
-  const [amt, setAmt] = useState('')
+type Props = { onSuccess: ()=>Promise<void> }
+
+export function IssueTokenForm({ onSuccess }: Props) {
+  const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    const a = +amt
-    if (a <= 0) return alert('Введите > 0')
+  async function issue() {
+    const v = +amount
+    if (!v || v <= 0) return alert('Введите сумму > 0')
     setLoading(true)
-    const res = await apiFetch('/wallet/issue-token', {
-      method:'POST', body: JSON.stringify({ amount: a })
-    })
-    setLoading(false)
-    if (!res.ok) {
-      const err = await res.json().catch(()=>null)
-      return alert(err?.detail || 'Ошибка резерва')
+    try {
+      const res = await apiFetch('/bank/issuance',{
+        method:'POST', body: JSON.stringify({ amount: v })
+      })
+      if (!res.ok) throw new Error()
+      const { token } = await res.json()
+      await apiFetch('/wallet/reserve',{
+        method:'POST', body: JSON.stringify({ token, amount: v })
+      })
+      await onSuccess()
+      setAmount('')
+    } catch {
+      alert('Ошибка выдачи токена')
+    } finally {
+      setLoading(false)
     }
-    onSuccess()
-    setAmt('')
   }
 
   return (
-    <form onSubmit={submit} className="form">
-      <input value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Сумма ₽" type="number" min="1" disabled={loading}/>
-      <button disabled={loading}>Резервировать</button>
-    </form>
+    <div className="issue">
+      <input
+        type="number"
+        placeholder="Сумма ₽"
+        value={amount}
+        onChange={e=>setAmount(e.target.value)}
+        disabled={loading}
+      />
+      <button disabled={loading} onClick={issue}>
+        {loading ? '…' : 'Получить токен'}
+      </button>
+    </div>
   )
 }

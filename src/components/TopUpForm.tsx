@@ -1,28 +1,42 @@
 import React, { useState } from 'react'
 import { apiFetch } from '../api/client'
 
-export function TopUpForm({ onSuccess }: { onSuccess: ()=>void }) {
-  const [amt, setAmt] = useState('')
+type Props = { onSuccess: ()=>Promise<void> }
+
+export function TopUpForm({ onSuccess }: Props) {
+  const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const a = +amt
-    if (a <= 0) return alert('Введите > 0')
+    const v = +amount
+    if (!v || v <= 0) return alert('Введите сумму > 0')
     setLoading(true)
-    const res = await apiFetch('/wallet/topup', {
-      method:'POST', body: JSON.stringify({ amount: a })
-    })
-    setLoading(false)
-    if (!res.ok) return alert('Ошибка пополнения')
-    onSuccess()
-    setAmt('')
+    try {
+      const res = await apiFetch('/wallet/topup',{
+        method:'POST',
+        body: JSON.stringify({ amount: v })
+      })
+      if (!res.ok) throw new Error()
+      await onSuccess()
+      setAmount('')
+    } catch {
+      alert('Ошибка пополнения')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <form onSubmit={submit} className="form">
-      <input value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Сумма ₽" type="number" min="1" disabled={loading}/>
-      <button disabled={loading}>Пополнить</button>
+    <form className="form" onSubmit={submit}>
+      <input
+        type="number"
+        placeholder="Сумма ₽"
+        value={amount}
+        onChange={e=>setAmount(e.target.value)}
+        disabled={loading}
+      />
+      <button disabled={loading}>{loading ? '…' : 'Пополнить'}</button>
     </form>
   )
 }
