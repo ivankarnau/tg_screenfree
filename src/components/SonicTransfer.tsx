@@ -23,12 +23,9 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   const serverRef = useRef<any>(null);
 
   function makePayload() {
-    // Минимальный полезный payload для передачи:
-    // Просто tokenId и сумма (для быстрого кодирования и высокой успешности)
     return `${tokenId}|${amount}`;
   }
 
-  // Передача
   async function startSend() {
     setStep('pin');
     setError(null);
@@ -44,7 +41,6 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     setStep('sending');
     setStatus("Передаём токен ультразвуком…");
 
-    // Используем sonicnet.js (как у charliegerard)
     socketRef.current = new window.SonicSocket();
     socketRef.current.send(makePayload());
 
@@ -52,10 +48,9 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       socketRef.current.stop();
       setStatus("Передача завершена!");
       setStep('success');
-    }, 6000); // 6 сек, оптимально
+    }, 6000);
   }
 
-  // Приём
   async function startReceive() {
     setMode('receive');
     setStep('listening');
@@ -64,7 +59,6 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     serverRef.current = new window.SonicServer();
     serverRef.current.on('message', (msg: string) => {
       try {
-        // Ожидаем строку вида "tokenId|amount"
         const [token, amt] = msg.split('|');
         if (!token || !amt) throw new Error();
         setReceivedToken({ token, amount: Number(amt) });
@@ -85,10 +79,9 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
         setStatus("Время ожидания истекло");
         setStep('idle');
       }
-    }, 12000); // 12 сек
+    }, 12000);
   }
 
-  // Зачисление
   async function claim() {
     if (!receivedToken) return;
     setStatus("Зачисляем токен...");

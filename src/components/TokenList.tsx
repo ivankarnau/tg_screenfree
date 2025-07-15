@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react'
-import { apiFetch } from '../api/client'
+import React from 'react'
 
 interface T { token_id: string, amount: number, created_at: string, redeemed_at: string | null }
 type Props = { selected: string | null, onSelect: (id: string) => void, tokens: T[] }

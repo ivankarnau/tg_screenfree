@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { apiFetch } from '../api/client'
 
-type Props = { onSuccess: ()=>Promise<void> }
+type Props = { onSuccess: () => Promise<void> }
 
 export function TopUpForm({ onSuccess }: Props) {
   const [amount, setAmount] = useState('')
