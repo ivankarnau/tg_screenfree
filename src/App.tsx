@@ -1,88 +1,64 @@
-// src/App.tsx
 import React, { useEffect, useState } from 'react'
 import { loginWithTelegram } from './api/auth'
 import { apiFetch } from './api/client'
-import { TopUpForm } from './components/TopUpForm'
 import { TokenList } from './components/TokenList'
+import { TopUpForm } from './components/TopUpForm'
+import { IssueTokenForm } from './components/IssueTokenForm'
 import { SonicControl } from './components/SonicControl'
-import { UltrasoundTransfer } from './components/UltrasoundTransfer'
-import './App.css'
 
 export default function App() {
-  const [balance, setBalance] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [available, setAvailable] = useState<number>(0)
+  const [reserved, setReserved] = useState<number>(0)
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function bootstrap() {
+    ;(async () => {
       try {
-        const tg = window.Telegram.WebApp
-        tg.ready()
-
-        const initData = tg.initData || ''
-        if (!initData) throw new Error('Отсутствует initData от Telegram')
-
+        const params = new URLSearchParams(window.location.search)
+        const initData = params.get('initData') || ''
+        if (!initData) throw new Error('Нет initData от Telegram')
         await loginWithTelegram(initData)
-        tg.MainButton.hide()
-
-        const res = await apiFetch('/wallet/balance')
-        if (!res.ok) throw new Error(`Ошибка: ${res.status}`)
-        setBalance((await res.json()).balance)
+        window.Telegram.WebApp.MainButton.hide()
+        await loadBalance()
       } catch (e: any) {
         setError(e.message)
       } finally {
         setLoading(false)
       }
-    }
-    bootstrap()
+    })()
   }, [])
 
-  if (loading) {
-    return (
-      <div className="App">
-        <h1 className="title">ScreenFree</h1>
-        <p className="info">Загрузка…</p>
-      </div>
-    )
+  async function loadBalance() {
+    const res = await apiFetch('/wallet/balance')
+    if (!res.ok) throw new Error(`Ошибка баланса: ${res.status}`)
+    const { available, reserved } = await res.json()
+    setAvailable(available)
+    setReserved(reserved)
   }
-  if (error) {
-    return (
-      <div className="App">
-        <h1 className="title">ScreenFree</h1>
-        <p className="info error">{error}</p>
-      </div>
-    )
-  }
+
+  if (loading) return <div className="App"><p>Загрузка…</p></div>
+  if (error)   return <div className="App error">Ошибка: {error}</div>
 
   return (
     <div className="App">
-      <header className="header">
-        <h1 className="title">ScreenFree</h1>
-      </header>
+      <section className="card">
+        <h2>Кошелёк</h2>
+        <p className="bal">Доступно: <b>{available} ₽</b></p>
+        <p className="bal">Заморожено: <b>{reserved} ₽</b></p>
+        <TopUpForm onSuccess={loadBalance} />
+      </section>
 
-      <main>
-        {/* Кошелёк */}
-        <section className="card">
-          <h2 className="card-title">Кошелёк</h2>
-          <p className="balance">{balance} ₽</p>
-          <TopUpForm onSuccess={setBalance} />
-          <TokenList />
-        </section>
+      <section className="card">
+        <h2>Токены P2P (UltraSonic)</h2>
+        <IssueTokenForm onSuccess={loadBalance} />
+        <TokenList />
+      </section>
 
-        {/* Ультразвуковое измерение */}
-        <section className="card">
-          <h2 className="card-title">Ультразвуковое измерение</h2>
-          <SonicControl />
-        </section>
-
-        {/* Ультразвуковой перевод */}
-        <section className="card">
-          <h2 className="card-title">Ультразвуковой перевод</h2>
-          <UltrasoundTransfer />
-        </section>
-      </main>
-
-      <footer className="footer">@screenfree_bot</footer>
+      <section className="card">
+        <h2>Ультразвук</h2>
+        <SonicControl />
+      </section>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { apiFetch } from '../api/client'
 
-export function TopUpForm({ onSuccess }: { onSuccess: ()=>void }) {
+export function IssueTokenForm({ onSuccess }: { onSuccess: ()=>void }) {
   const [amt, setAmt] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -10,11 +10,14 @@ export function TopUpForm({ onSuccess }: { onSuccess: ()=>void }) {
     const a = +amt
     if (a <= 0) return alert('Введите > 0')
     setLoading(true)
-    const res = await apiFetch('/wallet/topup', {
+    const res = await apiFetch('/wallet/issue-token', {
       method:'POST', body: JSON.stringify({ amount: a })
     })
     setLoading(false)
-    if (!res.ok) return alert('Ошибка пополнения')
+    if (!res.ok) {
+      const err = await res.json().catch(()=>null)
+      return alert(err?.detail || 'Ошибка резерва')
+    }
     onSuccess()
     setAmt('')
   }
@@ -22,7 +25,7 @@ export function TopUpForm({ onSuccess }: { onSuccess: ()=>void }) {
   return (
     <form onSubmit={submit} className="form">
       <input value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Сумма ₽" type="number" min="1" disabled={loading}/>
-      <button disabled={loading}>Пополнить</button>
+      <button disabled={loading}>Резервировать</button>
     </form>
   )
 }

@@ -1,76 +1,15 @@
-/* Общие стили */
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Inter, sans-serif; background: #f8f9fa; color: #333; }
-button { cursor: pointer; }
-
-/* Корневая обёртка */
-.App {
-  max-width: 500px;
-  margin: 0 auto;
-  padding: 16px;
-}
-
-/* Заголовки */
-.header, .footer { text-align: center; }
-.title { font-size: 1.75rem; margin-bottom: 8px; }
-
-/* Карточки секций */
-.card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 16px;
-  margin-top: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-.card-title { font-size: 1.25rem; margin-bottom: 12px; }
-
-/* Баланс */
-.balance {
-  font-size: 2rem;
-  font-weight: bold;
-  margin-bottom: 12px;
-}
-
-/* Форма пополнения */
-.form { display: flex; gap: 8px; }
-.input {
-  flex: 1;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-.button {
-  background: #40a7e3;
-  color: #fff;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-.button:disabled { background: #aacde5; cursor: default; }
-.button:not(:disabled):hover { background: #2d8ac4; }
-
-/* Секция ультразвука */
-.sonic .controls {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.result {
-  background: #f0f0f0;
-  padding: 12px;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  overflow-x: auto;
-}
-
-/* Информационные сообщения */
-.info { margin-top: 8px; color: #555; }
-.error { color: crimson; }
-
-/* Футер */
-.footer {
-  margin-top: 24px;
-  font-size: 0.85rem;
-  color: #777;
-}
+* { box-sizing: border-box; margin:0; padding:0 }
+body { font-family: Inter, sans-serif; background:#f5f5f5; color:#333 }
+.App { max-width:480px; margin:24px auto; padding:0 12px }
+.card { background:#fff; border-radius:8px; padding:16px; margin-bottom:16px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1) }
+.card h2 { margin-bottom:12px }
+.bal { margin:6px 0 }
+.form { display:flex; gap:8px }
+.form input { flex:1; padding:8px; border:1px solid #ccc; border-radius:4px }
+.form button { padding:8px 16px; background:#40a7e3; color:#fff; border:none;
+  border-radius:4px; cursor:pointer; }
+.form button:disabled { background:#aacde5; cursor:default; }
+.token-list { list-style:disc outside; padding-left:20px; margin-top:8px }
+.token-list li { margin-bottom:6px; font-size:0.9rem }
+.sonic { display:flex; align-items:center; gap:8px; margin-top:8px }

@@ -1,0 +1,25 @@
+version: "3.9"          # ← её можно оставить или убрать
+# env_file: .env          # ← УДАЛИТЕ эту строку
+services:
+  db:
+    image: postgres:16
+    env_file: .env         # ✔ добавьте здесь
+    environment:
+      POSTGRES_USER: sf
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: sfdb
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  api:
+    build: ./gateway
+    env_file: .env         # ✔ и здесь
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes: [./gateway:/app]
+    environment:
+      DATABASE_URL: postgresql://sf:secret@db/sfdb
+    ports: ["8000:8000"]
+    depends_on: [db]
+
+volumes:
+  pgdata:
