@@ -7,6 +7,8 @@ import { TokenList } from './components/TokenList'
 import { SonicTransfer } from './components/SonicTransfer'
 import './App.css'
 
+// --- PIN-код ---
+
 function PinSetup() {
   const [pin, setPin] = React.useState('')
   const [mode, setMode] = React.useState<'set' | 'locked' | 'change'>('set')
@@ -88,6 +90,8 @@ function PinSetup() {
   )
 }
 
+// --- ОСНОВНОЙ APP ---
+
 export default function App() {
   const [available, setAvailable] = useState<number>(0)
   const [reserved, setReserved] = useState<number>(0)
@@ -147,6 +151,22 @@ export default function App() {
     loadTokens()
   }
 
+  // --- ОБРАБОТКА ПРИЁМА ТОКЕНА ЧЕРЕЗ УЛЬТРАЗВУК ---
+  async function handleTokenReceive(tokenObj: any) {
+    if (tokenObj?.token_id) {
+      try {
+        await apiFetch('/wallet/claim', {
+          method: 'POST',
+          body: JSON.stringify({ token_id: tokenObj.token_id })
+        })
+        reloadTokens()
+        alert('Токен успешно принят и зачислен на ваш баланс!')
+      } catch {
+        alert('Ошибка при зачислении токена')
+      }
+    }
+  }
+
   return loading ? <LoadingScreen /> : error ? <ErrorScreen message={error} /> : (
     <div className="App">
       <PinSetup />
@@ -169,7 +189,11 @@ export default function App() {
           tokens={tokens}
         />
       </section>
-      <SonicTransfer tokenId={selectedToken} amount={selectedAmount} onSuccess={reloadTokens} />
+      <SonicTransfer
+        tokenId={selectedToken}
+        amount={selectedAmount}
+        onSuccess={handleTokenReceive}
+      />
       <section className="card" style={{ marginTop: 32 }}>
         <h2>История токенов</h2>
         <TokenHistory tokens={tokens} />

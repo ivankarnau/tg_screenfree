@@ -1,141 +1,126 @@
-import React, { useState, useRef } from "react";
-import { apiFetch } from '../api/client';
+import React, { useRef, useState } from 'react';
 
 declare global {
-  interface Window { SonicSocket: any; SonicServer: any; }
+  interface Window { Quiet: any }
 }
 
 type Props = {
   tokenId: string | null,
   amount: number | null,
   onSuccess: () => void
-}
+};
 
 export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
-  const [mode, setMode] = useState<'none' | 'send' | 'receive'>('none');
-  const [step, setStep] = useState<'idle' | 'pin' | 'sending' | 'listening' | 'claim' | 'success'>('idle');
-  const [pin, setPin] = useState('');
-  const [status, setStatus] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
-  const [receivedToken, setReceivedToken] = useState<{ token: string, amount: number } | null>(null);
+  const [mode, setMode] = useState<'idle'|'send'|'receive'|'done'|'error'>('idle');
+  const [status, setStatus] = useState('');
+  const txRef = useRef<any>(null);
+  const rxRef = useRef<any>(null);
 
-  const socketRef = useRef<any>(null);
-  const serverRef = useRef<any>(null);
-
-  function makePayload() {
-    return `${tokenId}|${amount}`;
-  }
-
-  async function startSend() {
-    setStep('pin');
-    setError(null);
-    setStatus("");
-  }
-  async function confirmPin() {
-    const saved = localStorage.getItem('user_pin') || '';
-    if (pin !== saved) {
-      setError("Неверный PIN");
+  // Передача токена ультразвуком
+  function transmitToken() {
+    if (!tokenId || !amount) {
+      setStatus('Выберите токен для передачи');
+      setMode('error');
       return;
     }
-    setError(null);
-    setStep('sending');
-    setStatus("Передаём токен ультразвуком…");
-
-    socketRef.current = new window.SonicSocket();
-    socketRef.current.send(makePayload());
-
-    setTimeout(() => {
-      socketRef.current.stop();
-      setStatus("Передача завершена!");
-      setStep('success');
-    }, 6000);
+    setMode('send');
+    setStatus('Передача токена ультразвуком...');
+    window.Quiet.init({
+      profilesPrefix: "./",
+      memoryInitializerPrefix: "./",
+      onReady: () => {
+        txRef.current = window.Quiet.transmitter({
+          profile: 'ultrasonic', // или 'ultrasonic-fsk'
+          onFinish: () => {
+            setStatus('Передача завершена!');
+            setMode('done');
+            txRef.current?.destroy();
+            onSuccess?.();
+          }
+        });
+        const payload = JSON.stringify({ token_id: tokenId, amount });
+        txRef.current.transmit(window.Quiet.str2ab(payload));
+        // Можно добавить таймер для красоты:
+        setTimeout(() => {
+          txRef.current?.destroy();
+          setStatus('Передача завершена!');
+          setMode('done');
+          onSuccess?.();
+        }, 7000);
+      }
+    });
   }
 
-  async function startReceive() {
+  // Приём токена ультразвуком
+  function receiveToken() {
     setMode('receive');
-    setStep('listening');
-    setStatus("Прослушиваем ультразвук…");
-
-    serverRef.current = new window.SonicServer();
-    serverRef.current.on('message', (msg: string) => {
-      try {
-        const [token, amt] = msg.split('|');
-        if (!token || !amt) throw new Error();
-        setReceivedToken({ token, amount: Number(amt) });
-        setStatus(`Получен токен на сумму ${amt} ₽`);
-        setStep('claim');
-        serverRef.current.stop();
-      } catch {
-        setStatus("Ошибка декодирования");
-        serverRef.current.stop();
-        setStep('idle');
+    setStatus('Слушаем ультразвук...');
+    window.Quiet.init({
+      profilesPrefix: "./",
+      memoryInitializerPrefix: "./",
+      onReady: () => {
+        rxRef.current = window.Quiet.receiver({
+          profile: 'ultrasonic',
+          onReceive: (buf: ArrayBuffer) => {
+            try {
+              const str = window.Quiet.ab2str(buf);
+              const data = JSON.parse(str);
+              setStatus(`Токен получен: ${data.amount}₽`);
+              setMode('done');
+              rxRef.current?.destroy();
+              // Вызов claim можно сделать здесь или отдельной кнопкой
+              onSuccess?.();
+            } catch {
+              setStatus("Ошибка декодирования");
+              setMode('error');
+              rxRef.current?.destroy();
+            }
+          }
+        });
+        // Остановить через 12 секунд если не получили:
+        setTimeout(() => {
+          if (mode === 'receive') {
+            rxRef.current?.destroy();
+            setStatus('Время ожидания истекло');
+            setMode('idle');
+          }
+        }, 12000);
       }
     });
-    serverRef.current.start();
-
-    setTimeout(() => {
-      if (step === 'listening') {
-        serverRef.current.stop();
-        setStatus("Время ожидания истекло");
-        setStep('idle');
-      }
-    }, 12000);
   }
 
-  async function claim() {
-    if (!receivedToken) return;
-    setStatus("Зачисляем токен...");
-    const res = await apiFetch('/wallet/claim', {
-      method: 'POST',
-      body: JSON.stringify({ token_id: receivedToken.token })
-    });
-    if (res.ok) {
-      setStatus("Токен зачислен!");
-      setStep('success');
-      setReceivedToken(null);
-      onSuccess();
-    } else {
-      setStatus("Ошибка при зачислении");
-    }
+  function stopAll() {
+    setMode('idle');
+    setStatus('');
+    txRef.current?.destroy();
+    rxRef.current?.destroy();
   }
 
   return (
     <div className="card sonic">
       <h2>Передача токена ультразвуком</h2>
-      <div className="sonic-controls">
-        <button className="button" onClick={() => { setMode('send'); setStep('idle'); setError(null); }} disabled={!tokenId}>Передать</button>
-        <button className="button" onClick={startReceive}>Принять</button>
-      </div>
-      {mode === 'send' && (
-        <div>
-          {step === 'idle' && <button className="button" onClick={startSend} disabled={!tokenId}>Запустить передачу</button>}
-          {step === 'pin' && (
-            <>
-              <div><b>Введите PIN:</b></div>
-              <input
-                type="password"
-                maxLength={4}
-                value={pin}
-                onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                className="input"
-              />
-              <button className="button" onClick={confirmPin}>Подтвердить</button>
-              {error && <div className="info error">{error}</div>}
-            </>
-          )}
-          {step === 'sending' && <div className="info">{status}</div>}
-          {step === 'success' && <div className="info" style={{ color: 'green' }}>{status}</div>}
+      {mode === 'idle' && (
+        <div className="sonic-controls">
+          <button className="button" onClick={transmitToken} disabled={!tokenId}>Передать</button>
+          <button className="button" onClick={receiveToken}>Слушать</button>
         </div>
       )}
-      {mode === 'receive' && (
+      {(mode === 'send' || mode === 'receive') && (
         <div>
-          {step === 'listening' && <div className="info">{status}</div>}
-          {step === 'claim' && receivedToken && (
-            <>
-              <div className="info">{status}</div>
-              <button className="button" onClick={claim}>Зачислить себе</button>
-            </>
-          )}
+          <div className="info">{status}</div>
+          <button className="button" onClick={stopAll}>Отмена</button>
+        </div>
+      )}
+      {mode === 'done' && (
+        <div>
+          <div className="info" style={{ color: 'green' }}>{status}</div>
+          <button className="button" onClick={stopAll}>Закрыть</button>
+        </div>
+      )}
+      {mode === 'error' && (
+        <div>
+          <div className="info error">{status}</div>
+          <button className="button" onClick={stopAll}>Закрыть</button>
         </div>
       )}
     </div>
