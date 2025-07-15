@@ -1,6 +1,10 @@
 import React, { useState, useRef } from "react";
 import { apiFetch } from '../api/client';
 
+declare global {
+  interface Window { SonicSocket: any; SonicServer: any; }
+}
+
 type Props = {
   tokenId: string | null,
   amount: number | null,
@@ -8,16 +12,15 @@ type Props = {
 }
 
 export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
-  const [status, setStatus] = useState("");
   const [mode, setMode] = useState<'none' | 'send' | 'receive'>('none');
-  const [step, setStep] = useState<'idle' | 'pin' | 'sending' | 'listening' | 'success'>('idle');
+  const [step, setStep] = useState<'idle' | 'pin' | 'sending' | 'listening' | 'claim' | 'success'>('idle');
   const [pin, setPin] = useState('');
+  const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const receivedToken = useRef<{ token: string, amount: number } | null>(null);
+  const [receivedToken, setReceivedToken] = useState<{ token: string, amount: number } | null>(null);
 
-  // Простая WebAudio реализация (MVP)
-  const audioCtx = useRef<AudioContext | null>(null);
-  const oscillator = useRef<OscillatorNode | null>(null);
+  const socketRef = useRef<any>(null);
+  const serverRef = useRef<any>(null);
 
   async function handleSendStart() {
     setStep('pin');
@@ -34,21 +37,19 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     }
     setError(null);
     setStep('sending');
-    setStatus("Передаём ультразвук... Держите устройства рядом 7 секунд!");
-    // Start ultrasound (MVP: просто сигнал)
-    const ctx = new AudioContext();
-    audioCtx.current = ctx;
-    oscillator.current = ctx.createOscillator();
-    oscillator.current.type = "sine";
-    oscillator.current.frequency.value = 19700;
-    oscillator.current.connect(ctx.destination);
+    setStatus("Передаём токен через ультразвук…");
 
-    oscillator.current.start();
+    const payload = JSON.stringify({
+      token: tokenId,
+      amount: amount
+    });
+
+    socketRef.current = new window.SonicSocket();
+    socketRef.current.send(payload);
 
     setTimeout(() => {
-      oscillator.current?.stop();
-      ctx.close();
-      setStatus("Передача завершена! Получатель должен был уловить сигнал.");
+      socketRef.current.stop();
+      setStatus("Передача завершена!");
       setStep('success');
     }, 7000);
   }
@@ -56,50 +57,59 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   async function handleReceive() {
     setMode('receive');
     setStep('listening');
-    setStatus("Слушаем ультразвук… (MVP: примите передачу рядом)");
-    // Здесь должен быть реальный приём звука (sonicnet.js), сейчас MVP — просто ждём 7 секунд
+    setStatus("Слушаем ультразвук…");
+
+    serverRef.current = new window.SonicServer();
+    serverRef.current.on('message', (msg: string) => {
+      try {
+        const data = JSON.parse(msg);
+        setReceivedToken(data);
+        setStatus(`Получен токен на сумму ${data.amount} ₽!`);
+        setStep('claim');
+        serverRef.current.stop();
+      } catch (e) {
+        setStatus('Ошибка приёма');
+      }
+    });
+
+    serverRef.current.start();
     setTimeout(() => {
-      // После "слушания" принимаем токен (MVP)
-      if (tokenId && amount) {
-        receivedToken.current = { token: tokenId, amount };
-        setStatus(`Получен токен на сумму ${amount} ₽! Нажмите "Зачислить"`);
-        setStep('success');
-      } else {
-        setStatus("Не удалось получить токен");
+      if (step === 'listening') {
+        serverRef.current.stop();
+        setStatus("Время ожидания истекло");
         setStep('idle');
       }
-    }, 7000);
+    }, 10000);
   }
 
   async function handleClaim() {
-    if (!receivedToken.current) return;
+    if (!receivedToken) return;
     setStatus("Зачисляем токен...");
     const res = await apiFetch('/wallet/claim', {
       method: 'POST',
-      body: JSON.stringify({ token_id: receivedToken.current.token })
+      body: JSON.stringify({ token_id: receivedToken.token })
     });
     if (res.ok) {
       setStatus("Токен зачислен!");
-      setStep('idle');
-      receivedToken.current = null;
+      setStep('success');
+      setReceivedToken(null);
       onSuccess();
     } else {
       setStatus("Ошибка при зачислении токена.");
     }
   }
 
-  // UI:
   return (
-    <div className="card">
+    <div className="card sonic">
       <h2>Передача токена ультразвуком</h2>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => { setMode('send'); setStep('idle'); setError(null); }} disabled={!tokenId}>Передать</button>
-        <button onClick={handleReceive}>Принять</button>
+      <div className="sonic-controls">
+        <button className="button" onClick={() => { setMode('send'); setStep('idle'); setError(null); }} disabled={!tokenId}>Передать</button>
+        <button className="button" onClick={handleReceive}>Принять</button>
       </div>
       {mode === 'send' && (
         <div style={{ marginTop: 12 }}>
           {step === 'idle' && (
-            <button onClick={handleSendStart} disabled={!tokenId}>Передать выбранный токен</button>
+            <button className="button" onClick={handleSendStart} disabled={!tokenId}>Передать выбранный токен</button>
           )}
           {step === 'pin' && (
             <div>
@@ -109,8 +119,9 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
                 maxLength={4}
                 value={pin}
                 onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                className="input"
               />
-              <button onClick={handleSendPin}>Подтвердить</button>
+              <button className="button" onClick={handleSendPin}>Подтвердить</button>
               {error && <div className="info error">{error}</div>}
             </div>
           )}
@@ -121,10 +132,10 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       {mode === 'receive' && (
         <div style={{ marginTop: 12 }}>
           {step === 'listening' && <div><b>{status}</b></div>}
-          {step === 'success' && (
+          {step === 'claim' && receivedToken && (
             <div>
               <div>{status}</div>
-              <button onClick={handleClaim}>Зачислить токен себе</button>
+              <button className="button" onClick={handleClaim}>Зачислить токен себе</button>
             </div>
           )}
         </div>
