@@ -1,58 +1,39 @@
-import React, { useEffect, useState } from "react"
-import { loginWithTelegram } from "./api/auth"
-import { apiFetch } from "./api/client"
-import { TopUpForm } from "./components/TopUpForm"
-import { IssueTokenForm } from "./components/IssueTokenForm"
-import { TokenList } from "./components/TokenList"
-import { SonicControl } from "./components/SonicControl"
-import "./App.css"
+import React, { useEffect, useState } from 'react';
+import { loginWithTelegram } from './api/auth';
+import { apiFetch } from './api/client';
+import './App.css';
 
 export default function App() {
-  const [available, setAvailable] = useState<number>(0)
-  const [reserved, setReserved]   = useState<number>(0)
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState<string|null>(null)
+  const [balance, setBalance] = useState<number|null>(null);
+  const [error, setError] = useState<string|null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    ;(async () => {
+    (async () => {
       try {
-        const tg = window.Telegram.WebApp
-        tg.ready()
+        // Инициализационные данные от Telegram
+        const params = new URLSearchParams(window.location.search);
+        const initData = params.get('initData') || '';
+        if (!initData) throw new Error('Нет initData от Telegram');
 
-        const initData = tg.initData
-        if (!initData) throw new Error("Нет initData от Telegram")
+        // Авторизуемся и сохраняем JWT
+        await loginWithTelegram(initData);
 
-        // 1) Login и сохранение токена
-        await loginWithTelegram(initData)
+        // Скрываем стандартную кнопку, чтобы не дублировать баланс
+        window.Telegram.WebApp.MainButton.hide();
 
-        // 2) Скрываем MainButton
-        tg.MainButton.hide()
-
-        // 3) Загружаем баланс
-        await loadBalance()
+        // Запрашиваем баланс
+        const res = await apiFetch('/wallet/balance');
+        if (!res.ok) throw new Error(`Ошибка при загрузке: ${res.status}`);
+        const { available, reserved } = await res.json();
+        setBalance(available); // или можно хранить отдельно оба
       } catch (e: any) {
-        console.error("Bootstrap error:", e)
-        setError(e.message)
+        setError(e.message);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    })()
-  }, [])
-
-  async function loadBalance() {
-    try {
-      const res = await apiFetch("/wallet/balance")
-      if (!res.ok) {
-        throw new Error(`Сервер вернул ${res.status}`)
-      }
-      const data = await res.json()
-      setAvailable(data.available)
-      setReserved(data.reserved)
-    } catch (e: any) {
-      console.error("Balance fetch error:", e)
-      throw new Error(`Не удалось загрузить баланс: ${e.message}`)
-    }
-  }
+    })();
+  }, []);
 
   if (loading) {
     return (
@@ -60,36 +41,36 @@ export default function App() {
         <h1 className="title">ScreenFree</h1>
         <p className="info">Загрузка…</p>
       </div>
-    )
+    );
   }
+
   if (error) {
     return (
       <div className="App">
         <h1 className="title">ScreenFree</h1>
         <p className="info error">Ошибка: {error}</p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="App">
-      <section className="card">
-        <h2>Кошелёк</h2>
-        <p>Доступно: <b>{available} ₽</b></p>
-        <p>Заморожено: <b>{reserved} ₽</b></p>
-        <TopUpForm onSuccess={loadBalance}/>
-      </section>
+      <header className="header">
+        <h1 className="title">ScreenFree</h1>
+      </header>
 
-      <section className="card">
-        <h2>Токены P2P (UltraSonic)</h2>
-        <IssueTokenForm onSuccess={loadBalance}/>
-        <TokenList/>
-      </section>
+      <main>
+        <section className="card">
+          <h2 className="card-title">Кошелёк</h2>
+          <p className="balance">{balance} ₽</p>
+          {/* ... форма пополнения и т.п. ... */}
+        </section>
+        {/* ... остальной UI ... */}
+      </main>
 
-      <section className="card">
-        <h2>Ультразвук</h2>
-        <SonicControl/>
-      </section>
+      <footer className="footer">
+        @screenfree_bot
+      </footer>
     </div>
-  )
+  );
 }
