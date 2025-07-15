@@ -1,20 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { apiFetch } from '../api/client'
 
-interface T { token_id: string, amount: number, created_at: string, redeemed_at: string|null }
-type Props = { selected: string|null, onSelect: (id: string) => void }
+interface T { token_id: string, amount: number, created_at: string, redeemed_at: string | null }
+type Props = { selected: string | null, onSelect: (id: string) => void, tokens: T[] }
 
-export function TokenList({ selected, onSelect }: Props) {
-  const [list, setList] = useState<T[]>([])
-  useEffect(()=>{
-    (async ()=>{
-      const res = await apiFetch('/wallet/tokens')
-      if (res.ok) setList(await res.json())
-    })()
-  },[])
+export function TokenList({ selected, onSelect, tokens }: Props) {
   return (
     <ul className="tokens">
-      {list.map(t=>(
+      {tokens.map(t => (
         <li
           key={t.token_id}
           style={{
@@ -24,9 +17,9 @@ export function TokenList({ selected, onSelect }: Props) {
           }}
           onClick={() => !t.redeemed_at && onSelect(t.token_id)}
         >
-          <b>{t.amount} ₽</b> — <small>{t.token_id.slice(0,8)}…</small><br/>
+          <b>{t.amount} ₽</b> — <small>{t.token_id.slice(0, 8)}…</small><br />
           <small>{new Date(t.created_at).toLocaleString()}</small>
-          {t.redeemed_at && <><br/><small>Погашен: {new Date(t.redeemed_at).toLocaleString()}</small></>}
+          {t.redeemed_at && <><br /><small>Погашен: {new Date(t.redeemed_at).toLocaleString()}</small></>}
         </li>
       ))}
     </ul>

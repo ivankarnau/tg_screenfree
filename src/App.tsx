@@ -8,38 +8,98 @@ import { SonicTransfer } from './components/SonicTransfer'
 import './App.css'
 
 function PinSetup() {
-  const [pin, setPin] = React.useState(localStorage.getItem('user_pin') || '');
+  const [pin, setPin] = React.useState('')
+  const [mode, setMode] = React.useState<'set' | 'locked' | 'change'>('set')
+  const [confirm, setConfirm] = React.useState('')
+  const [oldPin, setOldPin] = React.useState('')
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user_pin')
+    if (stored) setMode('locked')
+  }, [])
 
   function savePin() {
-    if (!/^\d{4}$/.test(pin)) return alert("Пин-код должен быть 4 цифры");
-    localStorage.setItem('user_pin', pin);
-    alert("PIN сохранён");
+    if (!/^\d{4}$/.test(pin)) return alert("Пин-код должен быть 4 цифры")
+    if (mode === 'set' && pin !== confirm) return alert("Пин-коды не совпадают")
+    localStorage.setItem('user_pin', pin)
+    setMode('locked')
+    setPin('')
+    setConfirm('')
+    setOldPin('')
+    alert("Пин-код сохранён")
   }
+
+  function requestChange() {
+    setMode('change')
+    setOldPin('')
+    setPin('')
+    setConfirm('')
+  }
+
+  function confirmChange() {
+    const stored = localStorage.getItem('user_pin') || ''
+    if (oldPin !== stored) return alert("Неверный старый PIN")
+    setMode('set')
+    setPin('')
+    setConfirm('')
+    setOldPin('')
+  }
+
+  if (mode === 'locked') {
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <b>PIN-код установлен.</b> <button onClick={requestChange}>Изменить PIN</button>
+      </div>
+    )
+  }
+  if (mode === 'change') {
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <b>Подтвердите старый PIN:</b>
+        <input
+          value={oldPin}
+          maxLength={4}
+          onChange={e => setOldPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        />
+        <button onClick={confirmChange}>Далее</button>
+      </div>
+    )
+  }
+  // mode === 'set'
   return (
-    <div style={{marginBottom:16}}>
-      <b>Ваш PIN (4 цифры): </b>
+    <div style={{ marginBottom: 16 }}>
+      <b>{localStorage.getItem('user_pin') ? "Новый PIN:" : "Придумайте PIN:"}</b>
       <input
         value={pin}
         maxLength={4}
         onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        style={{ marginLeft: 8 }}
+      />
+      <input
+        type="password"
+        placeholder="Подтвердите PIN"
+        value={confirm}
+        maxLength={4}
+        onChange={e => setConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        style={{ marginLeft: 8 }}
       />
       <button onClick={savePin}>Сохранить PIN</button>
     </div>
-  );
+  )
 }
 
 export default function App() {
   const [available, setAvailable] = useState<number>(0)
-  const [reserved, setReserved]   = useState<number>(0)
-  const [selectedToken, setSelectedToken] = useState<string|null>(null)
-  const [selectedAmount, setSelectedAmount] = useState<number|null>(null)
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState<string|null>(null)
-  const [tokens, setTokens]       = useState<any[]>([])
+  const [reserved, setReserved] = useState<number>(0)
+  const [selectedToken, setSelectedToken] = useState<string | null>(null)
+  const [selectedAmount, setSelectedAmount] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [tokens, setTokens] = useState<any[]>([])
   const [tokensChanged, setTokensChanged] = useState(0)
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const tg = window.Telegram.WebApp
         tg.ready()
@@ -57,6 +117,7 @@ export default function App() {
         setLoading(false)
       }
     })()
+    // eslint-disable-next-line
   }, [tokensChanged])
 
   async function loadBalance() {
@@ -74,7 +135,7 @@ export default function App() {
       const tks = await res.json()
       setTokens(tks)
       if (selectedToken) {
-        const sel = tks.find((t:any) => t.token_id === selectedToken)
+        const sel = tks.find((t: any) => t.token_id === selectedToken)
         setSelectedAmount(sel ? sel.amount : null)
       }
     }
@@ -100,9 +161,9 @@ export default function App() {
         <IssueTokenForm onSuccess={reloadTokens} />
         <TokenList
           selected={selectedToken}
-          onSelect={(id:string) => {
+          onSelect={(id: string) => {
             setSelectedToken(id)
-            const sel = tokens.find(t=>t.token_id===id)
+            const sel = tokens.find(t => t.token_id === id)
             setSelectedAmount(sel ? sel.amount : null)
           }}
           tokens={tokens}

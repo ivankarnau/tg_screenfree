@@ -1,142 +1,135 @@
 import React, { useState, useRef } from "react";
 import { apiFetch } from '../api/client';
 
-function encodeToken(token: string, amount: number) {
-  return btoa(JSON.stringify({ token, amount }));
-}
-function decodeToken(data: string) {
-  try {
-    return JSON.parse(atob(data));
-  } catch {
-    return null;
-  }
-}
-
 type Props = {
-  tokenId: string|null,
-  amount: number|null,
+  tokenId: string | null,
+  amount: number | null,
   onSuccess: () => void
 }
 
 export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   const [status, setStatus] = useState("");
-  const [mode, setMode] = useState<'none'|'send'|'receive'>('none');
-  const [received, setReceived] = useState<{token:string,amount:number}|null>(null);
+  const [mode, setMode] = useState<'none' | 'send' | 'receive'>('none');
+  const [step, setStep] = useState<'idle' | 'pin' | 'sending' | 'listening' | 'success'>('idle');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const receivedToken = useRef<{ token: string, amount: number } | null>(null);
 
-  // WebAudio — генерация ультразвука
-  const audioCtx = useRef<AudioContext|null>(null);
-  const oscillator = useRef<OscillatorNode|null>(null);
+  // Простая WebAudio реализация (MVP)
+  const audioCtx = useRef<AudioContext | null>(null);
+  const oscillator = useRef<OscillatorNode | null>(null);
 
-  function getPin(): string {
-    return localStorage.getItem('user_pin') || '';
+  async function handleSendStart() {
+    setStep('pin');
+    setPin('');
+    setStatus('');
+    setError(null);
   }
-  function requirePin(): boolean {
-    let pin = localStorage.getItem('user_pin');
-    if (!pin) {
-      pin = prompt('Придумайте 4-значный PIN:') || '';
-      if (!/^\d{4}$/.test(pin)) return false;
-      localStorage.setItem('user_pin', pin);
+
+  async function handleSendPin() {
+    const savedPin = localStorage.getItem('user_pin');
+    if (pin !== savedPin) {
+      setError("Неверный PIN!");
+      return;
     }
-    return true;
-  }
-
-  async function send() {
-    if (!tokenId || !amount) return setStatus("Выберите токен");
-    if (!requirePin()) return setStatus("PIN не установлен!");
-    setStatus("Передаём токен ультразвуком…");
-
-    // Простая реализация ультразвукового сигнала (вызывает звук, например, 18000-20000 Гц)
+    setError(null);
+    setStep('sending');
+    setStatus("Передаём ультразвук... Держите устройства рядом 7 секунд!");
+    // Start ultrasound (MVP: просто сигнал)
     const ctx = new AudioContext();
     audioCtx.current = ctx;
     oscillator.current = ctx.createOscillator();
     oscillator.current.type = "sine";
-    oscillator.current.frequency.value = 19500; // 19.5 kHz — ультразвук (может не быть слышен взрослым)
+    oscillator.current.frequency.value = 19700;
     oscillator.current.connect(ctx.destination);
 
-    // Encode payload в длительности
-    const payload = encodeToken(tokenId, amount);
-
-    // "Модулируем" данные: длительность = кол-ву символов * 100мс
     oscillator.current.start();
+
     setTimeout(() => {
       oscillator.current?.stop();
       ctx.close();
-      setStatus("Передача завершена! Второй телефон должен был получить токен.");
-    }, 700 + payload.length * 100);
-
-    // Если хочешь настоящую передачу данных — используй [sonicnet.js](https://github.com/adjih/sonicnet.js) (можно интегрировать, если надо, пиши).
+      setStatus("Передача завершена! Получатель должен был уловить сигнал.");
+      setStep('success');
+    }, 7000);
   }
 
-  // Приём ультразвука (MVP — симуляция)
-  async function receive() {
-    setStatus("Прослушивание ультразвука… (MVP: введите код вручную)");
-    // Реально слушать микрофон — это отдельная большая задача, можно подключить sonicnet.js/web-dtmf и т.д.
-    // Пока делаем ввод кода вручную для MVP
-    const manual = prompt("Введите код (base64):");
-    if (!manual) return;
-    const decoded = decodeToken(manual);
-    if (!decoded || !decoded.token) return setStatus("Не удалось декодировать токен.");
-    setReceived(decoded);
-    setStatus("Токен получен! Подтвердите зачисление.");
+  async function handleReceive() {
+    setMode('receive');
+    setStep('listening');
+    setStatus("Слушаем ультразвук… (MVP: примите передачу рядом)");
+    // Здесь должен быть реальный приём звука (sonicnet.js), сейчас MVP — просто ждём 7 секунд
+    setTimeout(() => {
+      // После "слушания" принимаем токен (MVP)
+      if (tokenId && amount) {
+        receivedToken.current = { token: tokenId, amount };
+        setStatus(`Получен токен на сумму ${amount} ₽! Нажмите "Зачислить"`);
+        setStep('success');
+      } else {
+        setStatus("Не удалось получить токен");
+        setStep('idle');
+      }
+    }, 7000);
   }
 
-  async function claim() {
-    if (!received) return;
-    setStatus("Зачисляем токен…");
+  async function handleClaim() {
+    if (!receivedToken.current) return;
+    setStatus("Зачисляем токен...");
     const res = await apiFetch('/wallet/claim', {
       method: 'POST',
-      body: JSON.stringify({ token_id: received.token })
+      body: JSON.stringify({ token_id: receivedToken.current.token })
     });
     if (res.ok) {
       setStatus("Токен зачислен!");
-      setReceived(null);
+      setStep('idle');
+      receivedToken.current = null;
       onSuccess();
     } else {
       setStatus("Ошибка при зачислении токена.");
     }
   }
 
+  // UI:
   return (
     <div className="card">
       <h2>Передача токена ультразвуком</h2>
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => setMode('send')} disabled={!tokenId}>Передать</button>
-        <button onClick={() => setMode('receive')}>Принять</button>
+        <button onClick={() => { setMode('send'); setStep('idle'); setError(null); }} disabled={!tokenId}>Передать</button>
+        <button onClick={handleReceive}>Принять</button>
       </div>
       {mode === 'send' && (
-        <div>
-          <button onClick={send} style={{ marginTop: 10 }}>Старт передачи</button>
-          <div>
-            {tokenId && (
-              <div style={{ fontSize: 13, marginTop: 8 }}>
-                <b>token_id:</b> <code>{tokenId}</code><br/>
-                <b>Сумма:</b> {amount} ₽<br/>
-                <span>Длительность передачи зависит от кода токена (MVP).</span>
-                <br />
-                <span>PIN-код потребуется для подтверждения передачи!</span>
-                <br /><br />
-                <span>Код для ручного теста: <code>{encodeToken(tokenId, amount)}</code></span>
-              </div>
-            )}
-          </div>
+        <div style={{ marginTop: 12 }}>
+          {step === 'idle' && (
+            <button onClick={handleSendStart} disabled={!tokenId}>Передать выбранный токен</button>
+          )}
+          {step === 'pin' && (
+            <div>
+              <b>Введите PIN для подтверждения:</b><br />
+              <input
+                type="password"
+                maxLength={4}
+                value={pin}
+                onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              />
+              <button onClick={handleSendPin}>Подтвердить</button>
+              {error && <div className="info error">{error}</div>}
+            </div>
+          )}
+          {step === 'sending' && <div><b>{status}</b></div>}
+          {step === 'success' && <div style={{ color: 'green' }}>{status}</div>}
         </div>
       )}
       {mode === 'receive' && (
-        <div>
-          <button onClick={receive} style={{ marginTop: 10 }}>Слушать</button>
-          {received && (
+        <div style={{ marginTop: 12 }}>
+          {step === 'listening' && <div><b>{status}</b></div>}
+          {step === 'success' && (
             <div>
-              <div style={{ fontSize: 13, marginTop: 8 }}>
-                <b>Принят токен!</b><br/>
-                token_id: <code>{received.token}</code><br/>
-                Сумма: {received.amount} ₽
-              </div>
-              <button onClick={claim}>Зачислить себе</button>
+              <div>{status}</div>
+              <button onClick={handleClaim}>Зачислить токен себе</button>
             </div>
           )}
         </div>
       )}
-      <div className="info">{status}</div>
+      <div className="info">{(mode !== 'none' && step === 'idle') ? status : ""}</div>
     </div>
   );
 }
