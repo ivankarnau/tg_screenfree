@@ -6,6 +6,8 @@
  */
 
 /** @namespace */
+var memoryInitializerPrefixURL = "";
+
 var Quiet = (function () {
   // sampleBufferSize is the number of audio samples we'll write per onaudioprocess call
   // must be a power of two. we choose the absolute largest permissible value
