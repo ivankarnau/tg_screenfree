@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ScreenFree Mini-App</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- ВАЖНО: Quiet.js подключается с абсолютными путями относительно public -->
-  <script>
-    window.QuietAssetsPath = '/quiet/';
-  </script>
-  <script src="/quiet/quiet.js"></script>
-  <script src="/quiet/quiet-emscripten.js"></script>
+  <meta charset="UTF-8">
+  <title>Ultrasonic App</title>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
+  <h1>Ultrasonic Transfer Test</h1>
+  <!-- Твой UI -->
+  <script src="public/quiet/quiet.js"></script>
+  <script>
+    Quiet.init({
+      profilesPrefix: "public/quiet/",
+      memoryInitializerPrefix: "public/quiet/"
+    });
+  </script>
+  <script async src="public/quiet/quiet-emscripten.js"></script>
 </body>
 </html>
