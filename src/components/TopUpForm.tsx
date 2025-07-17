@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../api/client';
-import './TopUpForm.css';
+import '../styles/Components/TopUpForm.css';
 
 type Props = { 
   onSuccess: () => void;

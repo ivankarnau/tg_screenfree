@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useTelegram } from '../hooks/useTelegram';
 import { apiFetch } from '../api/client';
-import './SonicTransfer.css';
+import '../styles/Components/SonicTransfer.css';
 
 declare global {
   interface Window {

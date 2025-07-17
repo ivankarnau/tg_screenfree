@@ -1,5 +1,5 @@
 import React from 'react';
-import './TokenList.css';
+import '../styles/Components/TokenList.css';
 
 interface Token {
   token_id: string;
