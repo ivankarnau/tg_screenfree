@@ -1,3 +1,5 @@
+// src/components/SonicTransfer.tsx
+
 import React, {
   useRef,
   useState,
@@ -25,15 +27,14 @@ declare global {
 
 type Props = {
   tokenId: string | null;
-  amount:  number | null;
+  amount: number | null;
   onSuccess?: (receivedToken?: any) => void;
 };
 
 export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   const { showPopup } = useTelegram();
 
-  const [mode, setMode] =
-    useState<'idle' | 'send' | 'receive' | 'done' | 'error'>('idle');
+  const [mode, setMode] = useState<'idle' | 'send' | 'receive' | 'done' | 'error'>('idle');
   const [status, setStatus] = useState('');
   const [volumeLevel, setVolumeLevel] = useState(0);
   const [isQuietReady, setIsQuietReady] = useState(false);
@@ -47,28 +48,26 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   const audioOK = !!(window.AudioContext || window.webkitAudioContext);
   const micOK = !!navigator.mediaDevices?.getUserMedia;
 
-  /* ===== Quiet.js readiness listener (postMessage) =================== */
   useEffect(() => {
     const handle = (e: MessageEvent) => {
       if (e.data === 'quiet-ready') {
+        console.log('[Quiet] ready from iframe or main');
         setIsQuietReady(true);
-        console.log('[Quiet] Ready from iframe');
-      }
-      if (typeof e.data === 'string' && e.data.startsWith('quiet-failed')) {
-        console.error('[Quiet] Init failed:', e.data);
+      } else if (typeof e.data === 'string' && e.data.startsWith('quiet-failed')) {
+        console.error('[Quiet] init failed', e.data);
       }
     };
     window.addEventListener('message', handle);
     return () => window.removeEventListener('message', handle);
   }, []);
 
-  /* ===== fallback: detect Quiet directly (Android / desktop) ========= */
   useEffect(() => {
     const tick = () => {
       if (window.Quiet && typeof window.Quiet.transmitter === 'function') {
+        console.log('[Quiet] detected directly');
         setIsQuietReady(true);
       } else {
-        setTimeout(tick, 200);
+        setTimeout(tick, 300);
       }
     };
     tick();
@@ -95,7 +94,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       showPopup({ title: 'Ошибка', message: 'Аудиомодуль ещё не готов' });
       return;
     }
-    if (!tokenId || !amount) {
+    if (!tokenId || typeof amount !== 'number' || isNaN(amount)) {
       showPopup({ title: 'Ошибка', message: 'Выберите токен для передачи' });
       return;
     }
@@ -104,14 +103,13 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     setStatus('Идёт передача…');
 
     try {
-      if (!await ensureAudioContext()) {
-        throw new Error('AudioContext не запущен');
-      }
+      if (!await ensureAudioContext()) throw new Error('AudioContext не запущен');
 
       txRef.current?.destroy();
       txRef.current = window.Quiet.transmitter({
         profile: 'ultrasonic',
         onFinish: () => {
+          console.log('[Quiet] передача завершена');
           setMode('done');
           setStatus('Передача завершена');
           onSuccess?.();
@@ -121,19 +119,17 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
 
       await new Promise(r => setTimeout(r, 100));
       const payload = JSON.stringify({
-        token_id: tokenId,
-        amount,
+        token_id: String(tokenId),
+        amount: Number(amount),
         ts: Date.now()
       });
+      console.log('[Quiet] transmit:', payload);
       txRef.current.transmit(window.Quiet.str2ab(payload));
     } catch (e: any) {
       console.error('[Quiet] TX error', e);
       setMode('error');
       setStatus('Ошибка передачи');
-      showPopup({
-        title: 'Ошибка передачи',
-        message: e?.message || 'Не удалось передать токен'
-      });
+      showPopup({ title: 'Ошибка передачи', message: e?.message || 'Не удалось передать токен' });
       cleanup();
     }
   }, [isQuietReady, tokenId, amount, onSuccess, ensureAudioContext, showPopup]);
@@ -146,9 +142,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     if (!micOK) {
       showPopup({
         title: 'Ошибка',
-        message: window.isIOS
-          ? 'Разрешите доступ к микрофону в настройках Telegram'
-          : 'Браузер не поддерживает микрофон'
+        message: window.isIOS ? 'Разрешите доступ к микрофону в настройках Telegram' : 'Браузер не поддерживает микрофон'
       });
       return;
     }
@@ -158,7 +152,6 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
 
     try {
       rxRef.current?.destroy();
-
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
@@ -168,7 +161,6 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       });
 
       await ensureAudioContext();
-
       const AC = window.AudioContext || window.webkitAudioContext;
       const ctx = audioContextRef.current ?? new AC();
       const source = ctx.createMediaStreamSource(stream);
@@ -189,14 +181,22 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
         profile: 'ultrasonic',
         onReceive: (ab: ArrayBuffer) => {
           try {
-            const data = JSON.parse(window.Quiet.ab2str(ab));
+            const str = window.Quiet.ab2str(ab);
+            console.log('[Quiet] получено:', str);
+            const data = JSON.parse(str);
             if (data.token_id && data.amount) {
               setMode('done');
               setStatus('Токен получен!');
               onSuccess?.(data);
+            } else {
+              throw new Error('Неверный формат данных');
             }
           } catch (e) {
             console.error('[Quiet] decode error', e);
+            setMode('error');
+            setStatus('Ошибка декодирования');
+            showPopup({ title: 'Ошибка приёма', message: 'Данные некорректны или нераспознаны' });
+            cleanup();
           }
         },
         onCreateFail: (e: any) => { throw new Error(e); }
@@ -207,9 +207,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       setStatus('Ошибка приёма');
       showPopup({
         title: 'Ошибка приёма',
-        message: window.isIOS
-          ? 'Проверьте разрешение на микрофон'
-          : e?.message || 'Не удалось получить токен'
+        message: window.isIOS ? 'Проверьте разрешение на микрофон' : e?.message || 'Не удалось получить токен'
       });
       cleanup();
     }
@@ -264,7 +262,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
             <button
               className="sonic-button primary"
               onClick={transmit}
-              disabled={!tokenId}
+              disabled={!tokenId || typeof amount !== 'number'}
             >
               📤 Передать токен
             </button>
