@@ -1,43 +1,37 @@
-/* ========== SonicTransfer.css (полный файл) ========= */
+/* === SonicTransfer.css ==================================== */
 :root{
-  --primary:#1976d2;        --primary-light:#1e88e5;
-  --success:#4caf50;        --error:#e53935;
-  --bg-card:#1c1f24;        --bg-element:#262a31;
-  --text-on-primary:#fff;   --text-secondary:#9ca3af;
+  --primary:#1976d2; --primary-light:#1e88e5;
+  --success:#4caf50; --error:#e53935;
+  --bg-card:#1c1f24; --bg-element:#262a31;
+  --text-on-primary:#fff; --text-secondary:#9ca3af;
   --border-light:#404448;
-  --space-sm:.5rem;         --space-md:1rem; --space-lg:1.5rem;
-  --radius-sm:6px;          --radius-md:10px;--radius-lg:14px;
-  --shadow-md:0 4px 10px rgba(0,0,0,.3);
+  --radius-md:10px; --shadow-md:0 4px 10px rgba(0,0,0,.3);
 }
 
-/* ------ контейнер ------ */
 .sonic-transfer{
-  position:relative;padding:var(--space-lg);border-radius:var(--radius-lg);
+  position:relative;padding:1.5rem;border-radius:14px;
   background:var(--bg-card);color:#fff;box-shadow:var(--shadow-md);
 }
-.sonic-title{margin:0 0 var(--space-md);font-size:1.25rem;font-weight:600;}
+.sonic-title{margin:0 0 1rem;font-size:1.25rem;font-weight:600;}
+.btn-row{display:flex;gap:.75rem;flex-wrap:wrap;}
 
-/* ------ кнопки ------ */
-.sonic-btn{padding:.8rem 1.6rem;border:none;border-radius:var(--radius-md);
+.sonic-btn{padding:.75rem 1.5rem;border:none;border-radius:var(--radius-md);
   font-weight:600;cursor:pointer;transition:.15s;}
 .sonic-btn.primary{background:var(--primary);color:var(--text-on-primary);}
 .sonic-btn.primary:disabled{background:var(--border-light);cursor:not-allowed;}
 .sonic-btn.secondary{background:var(--bg-element);color:var(--primary);
   border:1px solid var(--primary);}
 .sonic-btn.cancel{background:var(--border-light);color:#fff;}
-.sonic-btn:hover:not(:disabled){filter:brightness(1.08);}
 
-/* ------ статусы ------ */
-.sonic-status{margin:.6rem 0;font-weight:500;text-align:center;}
+.sonic-status{margin:.6rem 0;text-align:center;font-weight:500;}
 .sonic-status.success{color:var(--success);}
 .sonic-status.error{color:var(--error);}
 
-/* ------ эквалайзер ------ */
 .sonic-eq{display:flex;gap:4px;height:18px;margin:.4rem 0;}
-.bar{flex:1;background:var(--primary);opacity:.15;transition:opacity .06s;height:100%;border-radius:2px;}
+.bar{flex:1;height:100%;background:var(--primary);
+  opacity:.15;transition:opacity .06s;border-radius:2px;}
 .bar.on{opacity:1;}
 
-/* ------ фоновые волны ------ */
 .sonic-active::before,.sonic-active::after{
   content:'';position:absolute;inset:0;border-radius:inherit;
   background:radial-gradient(circle,rgba(25,118,210,.15)0%,transparent 70%);
@@ -45,11 +39,4 @@
 .sonic-active::after{animation-delay:.75s;}
 @keyframes wave{0%{transform:scale(.5);opacity:.5;}100%{transform:scale(1.7);opacity:0;}}
 
-/* ------ iOS hint ------ */
 .ios-hint{margin-top:.8rem;font-size:.85rem;color:var(--text-secondary);}
-
-/* responsive */
-@media(max-width:480px){
-  .sonic-transfer{padding:var(--space-md);}
-  .sonic-btn{padding:.6rem 1.2rem;font-size:.9rem;}
-}
