@@ -9,42 +9,28 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <script>
-    /* флаги окружения */
     window.isIOS      = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     window.isTelegram = navigator.userAgent.includes('Telegram');
   </script>
 
-  <!-- ================================================================
-       Quiet: 1) биндинги  (quiet.js создаёт window.Quiet и Module)
-       ============================================================== -->
+  <!-- Quiet bindings -->
   <script src="/quiet/quiet.js"></script>
-
-  <!-- 2) сразу после quiet.js вызываем Quiet.init()
-         (так требует библиотека; wasm загрузится позже)              -->
   <script>
     Quiet.init({
-      profilesPrefix:          '/quiet/',   // quiet-profiles.json
-      memoryInitializerPrefix: '/quiet/'    // quiet-emscripten.js.mem
+      profilesPrefix:          '/quiet/',
+      memoryInitializerPrefix: '/quiet/'
     });
 
     Quiet.addReadyCallback(
       () => {
-        console.log('[Quiet] ready (desktop / android)');
         window.postMessage('quiet-ready','*');
       },
       (e) => {
-        console.error('[Quiet] init error', e);
         window.postMessage('quiet-failed:' + e, '*');
       }
     );
   </script>
-
-  <!-- 3) wasm-рантайм + .mem    (подгрузится асинхронно) -->
   <script async src="/quiet/quiet-emscripten.js"></script>
-
-  <!-- =================================================================
-       iOS WebView workaround: wasm инициализируем в iframe
-       ================================================================= -->
   <script>
     if (window.isIOS) {
       const iosBootstrap = () => {
@@ -66,18 +52,13 @@
         `;
         document.body.appendChild(frame);
       };
-
-      /* Web-Audio на iOS разблокируется только после первого тапа */
       window.addEventListener('touchstart', iosBootstrap, { once:true });
       window.addEventListener('click',      iosBootstrap, { once:true });
     }
   </script>
 </head>
-
 <body>
   <div id="root"></div>
-
-  <!-- React/Vite точка входа -->
   <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
