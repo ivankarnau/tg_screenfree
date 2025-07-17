@@ -8,7 +8,6 @@ import { SonicTransfer } from './components/SonicTransfer'
 import './App.css'
 
 // --- PIN-код ---
-
 function PinSetup() {
   const [pin, setPin] = React.useState('')
   const [mode, setMode] = React.useState<'set' | 'locked' | 'change'>('set')
