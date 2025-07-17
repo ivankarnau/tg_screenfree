@@ -4,16 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ScreenFree Mini-App</title>
+  
+  <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  
+  <!-- Проверка поддержки аудио -->
+  <script>
+    window.isAudioSupported = !!(window.AudioContext || window.webkitAudioContext);
+    window.isGetUserMediaSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  </script>
   
   <!-- Подключаем Quiet.js ассеты -->
   <script src="/quiet/quiet.js"></script>
   <script>
-    // Для корректной работы quiet-emscripten.js и quiet.js
-    Quiet.init({
-      profilesPrefix: "/quiet/",
-      memoryInitializerPrefix: "/quiet/"
-    });
+    // Инициализация Quiet.js
+    if (window.isAudioSupported) {
+      Quiet.init({
+        profilesPrefix: "/quiet/",
+        memoryInitializerPrefix: "/quiet/"
+      });
+    }
   </script>
   <script async src="/quiet/quiet-emscripten.js"></script>
 </head>
@@ -30,11 +40,11 @@
           const context = new (window.AudioContext || window.webkitAudioContext)();
           if (context.state === 'suspended') {
             context.resume().then(() => {
-              setTimeout(() => context.close(), 500);
+              console.log('AudioContext activated for iOS');
             });
           }
         } catch (e) {
-          console.log('AudioContext activation error:', e);
+          console.error('AudioContext activation error:', e);
         }
       }, { once: true, passive: true });
     }
@@ -46,11 +56,13 @@
       iframe.srcdoc = `
         <script src="/quiet/quiet.js"><\/script>
         <script>
-          Quiet.init({
-            profilesPrefix: "/quiet/",
-            memoryInitializerPrefix: "/quiet/"
-          });
-          parent.postMessage('quiet-loaded', '*');
+          if (window.isAudioSupported) {
+            Quiet.init({
+              profilesPrefix: "/quiet/",
+              memoryInitializerPrefix: "/quiet/"
+            });
+            parent.postMessage('quiet-loaded', '*');
+          }
         <\/script>
       `;
       document.body.appendChild(iframe);

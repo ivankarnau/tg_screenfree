@@ -36,6 +36,30 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number>(0);
 
+  // Проверка поддержки аудио API
+  const isAudioSupported = !!(window.AudioContext || window.webkitAudioContext);
+  const isGetUserMediaSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+  // Активация аудиоконтекста при первом взаимодействии
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const context = new AudioContext();
+        if (context.state === 'suspended') {
+          context.resume().then(() => {
+            console.log('AudioContext activated');
+          });
+        }
+      } catch (e) {
+        console.error('AudioContext activation error:', e);
+      }
+    };
+
+    document.addEventListener('click', handleFirstInteraction, { once: true });
+    return () => document.removeEventListener('click', handleFirstInteraction);
+  }, []);
+
   // Инициализация Quiet.js
   useEffect(() => {
     if (!window.Quiet || isQuietReady) return;
@@ -50,9 +74,13 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       (e) => {
         setStatus(`Ошибка Quiet.js: ${e}`);
         setMode('error');
+        showPopup({
+          title: 'Ошибка аудио',
+          message: 'Не удалось инициализировать аудио модуль'
+        });
       }
     );
-  }, [isQuietReady]);
+  }, [isQuietReady, showPopup]);
 
   // Для iOS: обработка iframe
   useEffect(() => {
@@ -71,6 +99,10 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   // Настройка аудиоанализатора
   const setupAudioAnalyser = useCallback(async () => {
     try {
+      if (!isGetUserMediaSupported) {
+        throw new Error('Браузер не поддерживает доступ к микрофону');
+      }
+
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       audioContextRef.current = new AudioContext();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -97,7 +129,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       console.error('Audio setup error:', err);
       showPopup({
         title: 'Ошибка микрофона',
-        message: 'Не удалось получить доступ к микрофону'
+        message: 'Не удалось получить доступ к микрофону. Пожалуйста, проверьте разрешения.'
       });
       return false;
     }
@@ -132,6 +164,11 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     setStatus('Идет передача токена...');
     
     try {
+      // Активируем аудиоконтекст перед передачей
+      if (audioContextRef.current?.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+
       txRef.current = window.Quiet.transmitter({
         profile: 'ultrasonic-experimental',
         onFinish: () => {
@@ -142,6 +179,10 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
             message: 'Токен успешно передан'
           });
           onSuccess?.();
+        },
+        onCreateFail: (err: any) => {
+          setStatus(`Ошибка передатчика: ${err}`);
+          setMode('error');
         }
       });
       
@@ -155,6 +196,10 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       setStatus('Ошибка передачи');
       setMode('error');
       console.error('Transmission error:', error);
+      showPopup({
+        title: 'Ошибка передачи',
+        message: 'Не удалось передать токен. Попробуйте еще раз.'
+      });
     }
   }, [isQuietReady, tokenId, amount, onSuccess, showPopup]);
 
@@ -163,6 +208,16 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     if (!isQuietReady) {
       setStatus("Аудио модуль не готов");
       setMode('error');
+      return;
+    }
+
+    if (!isGetUserMediaSupported) {
+      setStatus("Браузер не поддерживает микрофон");
+      setMode('error');
+      showPopup({
+        title: 'Ошибка',
+        message: 'Ваш браузер не поддерживает доступ к микрофону'
+      });
       return;
     }
 
@@ -194,14 +249,22 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
         onCreateFail: (err: any) => {
           setStatus(`Ошибка приемника: ${err}`);
           setMode('error');
+          showPopup({
+            title: 'Ошибка приемника',
+            message: 'Не удалось настроить приемник звука'
+          });
         }
       });
-    } catch (error) {
-      setStatus('Ошибка приема');
+    } catch (error: any) {
+      setStatus(`Ошибка: ${error.message}`);
       setMode('error');
       console.error('Reception error:', error);
+      showPopup({
+        title: 'Ошибка приема',
+        message: error.message || 'Не удалось начать прием токена'
+      });
     }
-  }, [isQuietReady, setupAudioAnalyser, onSuccess]);
+  }, [isQuietReady, setupAudioAnalyser, onSuccess, showPopup]);
 
   // Остановка операции
   const stopOperation = useCallback(() => {
@@ -216,6 +279,15 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       cleanup();
     };
   }, [cleanup]);
+
+  if (!isAudioSupported) {
+    return (
+      <div className="sonic-error">
+        <h3>Ваш браузер не поддерживает Web Audio API</h3>
+        <p>Пожалуйста, используйте Chrome, Firefox или Safari</p>
+      </div>
+    );
+  }
 
   if (!isQuietReady) {
     return (
@@ -247,6 +319,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
             <button
               className="sonic-button secondary"
               onClick={receiveToken}
+              disabled={!isGetUserMediaSupported}
             >
               📥 Получить токен
             </button>
