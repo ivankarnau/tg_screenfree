@@ -1,148 +1,55 @@
-.sonic-transfer {
-  position: relative;
-  padding: var(--space-lg);
-  background-color: var(--bg-card);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
+/* ========== SonicTransfer.css (полный файл) ========= */
+:root{
+  --primary:#1976d2;        --primary-light:#1e88e5;
+  --success:#4caf50;        --error:#e53935;
+  --bg-card:#1c1f24;        --bg-element:#262a31;
+  --text-on-primary:#fff;   --text-secondary:#9ca3af;
+  --border-light:#404448;
+  --space-sm:.5rem;         --space-md:1rem; --space-lg:1.5rem;
+  --radius-sm:6px;          --radius-md:10px;--radius-lg:14px;
+  --shadow-md:0 4px 10px rgba(0,0,0,.3);
 }
 
-.sonic-transfer-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--primary);
-  margin-top: 0;
-  margin-bottom: var(--space-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
+/* ------ контейнер ------ */
+.sonic-transfer{
+  position:relative;padding:var(--space-lg);border-radius:var(--radius-lg);
+  background:var(--bg-card);color:#fff;box-shadow:var(--shadow-md);
 }
+.sonic-title{margin:0 0 var(--space-md);font-size:1.25rem;font-weight:600;}
 
-.sonic-transfer-icon {
-  font-size: 1.5rem;
-}
+/* ------ кнопки ------ */
+.sonic-btn{padding:.8rem 1.6rem;border:none;border-radius:var(--radius-md);
+  font-weight:600;cursor:pointer;transition:.15s;}
+.sonic-btn.primary{background:var(--primary);color:var(--text-on-primary);}
+.sonic-btn.primary:disabled{background:var(--border-light);cursor:not-allowed;}
+.sonic-btn.secondary{background:var(--bg-element);color:var(--primary);
+  border:1px solid var(--primary);}
+.sonic-btn.cancel{background:var(--border-light);color:#fff;}
+.sonic-btn:hover:not(:disabled){filter:brightness(1.08);}
 
-.sonic-controls {
-  display: flex;
-  gap: var(--space-md);
-  margin-bottom: var(--space-md);
-}
+/* ------ статусы ------ */
+.sonic-status{margin:.6rem 0;font-weight:500;text-align:center;}
+.sonic-status.success{color:var(--success);}
+.sonic-status.error{color:var(--error);}
 
-.sonic-btn {
-  flex: 1;
-  padding: var(--space-md);
-  border: none;
-  border-radius: var(--radius-md);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-}
+/* ------ эквалайзер ------ */
+.sonic-eq{display:flex;gap:4px;height:18px;margin:.4rem 0;}
+.bar{flex:1;background:var(--primary);opacity:.15;transition:opacity .06s;height:100%;border-radius:2px;}
+.bar.on{opacity:1;}
 
-.sonic-btn-primary {
-  background-color: var(--primary);
-  color: var(--text-on-primary);
-}
+/* ------ фоновые волны ------ */
+.sonic-active::before,.sonic-active::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:radial-gradient(circle,rgba(25,118,210,.15)0%,transparent 70%);
+  animation:wave 1.5s infinite;pointer-events:none;}
+.sonic-active::after{animation-delay:.75s;}
+@keyframes wave{0%{transform:scale(.5);opacity:.5;}100%{transform:scale(1.7);opacity:0;}}
 
-.sonic-btn-primary:hover {
-  background-color: var(--primary-dark);
-}
+/* ------ iOS hint ------ */
+.ios-hint{margin-top:.8rem;font-size:.85rem;color:var(--text-secondary);}
 
-.sonic-btn-secondary {
-  background-color: var(--bg-element);
-  color: var(--primary);
-  border: 1px solid var(--primary);
-}
-
-.sonic-btn-secondary:hover {
-  background-color: rgba(25, 118, 210, 0.1);
-}
-
-.sonic-status {
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-md);
-  text-align: center;
-  font-weight: 500;
-}
-
-.sonic-status-active {
-  background-color: var(--primary-light);
-  color: var(--primary);
-}
-
-.sonic-status-success {
-  background-color: rgba(76, 175, 80, 0.1);
-  color: var(--success);
-}
-
-.sonic-status-error {
-  background-color: rgba(211, 47, 47, 0.1);
-  color: var(--error);
-}
-
-.volume-meter {
-  width: 100%;
-  height: 20px;
-  background-color: var(--bg-element);
-  border-radius: 10px;
-  margin: var(--space-md) 0;
-  overflow: hidden;
-}
-
-.volume-level {
-  height: 100%;
-  background: linear-gradient(to right, var(--success), var(--warning));
-  transition: width 0.1s ease;
-}
-
-.sonic-wave {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: radial-gradient(circle, rgba(25, 118, 210, 0.1) 0%, transparent 70%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.sonic-active .sonic-wave {
-  animation: sonicWave 1.5s infinite;
-}
-
-@keyframes sonicWave {
-  0% {
-    transform: scale(0.5);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
-  }
-}
-
-/* iOS специфичные стили */
-.ios-warning {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  padding: var(--space-sm);
-  background-color: var(--bg-element);
-  border-radius: var(--radius-sm);
-  margin-top: var(--space-md);
-  text-align: center;
-}
-
-/* Адаптивные стили */
-@media (max-width: 480px) {
-  .sonic-controls {
-    flex-direction: column;
-  }
-  
-  .sonic-transfer {
-    padding: var(--space-md);
-  }
+/* responsive */
+@media(max-width:480px){
+  .sonic-transfer{padding:var(--space-md);}
+  .sonic-btn{padding:.6rem 1.2rem;font-size:.9rem;}
 }
