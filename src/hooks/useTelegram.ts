@@ -17,22 +17,38 @@ declare global {
   }
 }
 
-/**
- * Полный хук для работы с Telegram WebApp
- */
 export function useTelegram() {
   const [webApp, setWebApp] = useState<WebApp | null>(null);
   const [isIos, setIsIos] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Инициализация WebApp и проверка платформы
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (!tg) return;
+    const init = () => {
+      const tg = window.Telegram?.WebApp;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+        setWebApp(tg);
+        setIsIos(/iPhone|iPad|iPod/i.test(navigator.userAgent));
+      }
+      setIsInitialized(true);
+    };
 
-    tg.ready();
-    tg.expand();
-    setWebApp(tg);
-    setIsIos(/iPhone|iPad|iPod/i.test(navigator.userAgent));
+    if (window.Telegram?.WebApp) {
+      init();
+    } else {
+      // Если WebApp не загружен, ждем немного и пробуем снова
+      const timer = setTimeout(() => {
+        if (window.Telegram?.WebApp) {
+          init();
+        } else {
+          setIsInitialized(true);
+          console.warn('Telegram WebApp not detected');
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   const useMainButton = (
@@ -119,7 +135,11 @@ export function useTelegram() {
     message: string;
     buttons?: { id: string; text: string; type?: 'default' | 'ok' | 'close' | 'destructive' }[];
   }) => {
-    if (!webApp) return null;
+    if (!webApp) {
+      // Fallback для тестирования вне Telegram
+      alert(`${params.title}\n${params.message}`);
+      return { id: 'browser_fallback' };
+    }
     
     try {
       return await webApp.showPopup({
@@ -144,6 +164,7 @@ export function useTelegram() {
   return {
     webApp,
     isIos,
+    isInitialized,
     user: webApp?.initDataUnsafe?.user,
     themeParams: webApp?.themeParams,
     useMainButton,
@@ -154,7 +175,4 @@ export function useTelegram() {
   };
 }
 
-/**
- * Алиас для обратной совместимости
- */
 export const useTelegramEffect = useEffect;

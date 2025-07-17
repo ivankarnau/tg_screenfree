@@ -291,3 +291,60 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* Добавить в конец App.css */
+.app-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: var(--space-lg);
+  text-align: center;
+  gap: var(--space-md);
+}
+
+.app-error h2 {
+  color: var(--error);
+  font-size: 1.5rem;
+  margin-bottom: var(--space-sm);
+}
+
+.app-error p {
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+}
+
+.dev-mode-button {
+  padding: var(--space-md) var(--space-lg);
+  background-color: var(--primary);
+  color: var(--text-on-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.dev-mode-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.dev-mode-button:active {
+  transform: scale(0.98);
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--primary-light);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

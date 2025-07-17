@@ -123,6 +123,7 @@ const App = () => {
   const {
     webApp,
     isIos,
+    isInitialized,
     showPopup
   } = useTelegram();
 
@@ -134,6 +135,7 @@ const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [tokens, setTokens] = useState<any[]>([]);
   const [tokensChanged, setTokensChanged] = useState(0);
+  const [devMode, setDevMode] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -165,11 +167,19 @@ const App = () => {
   useEffect(() => {
     const initApp = async () => {
       try {
-        if (!webApp?.initData) {
-          throw new Error('Откройте приложение через Telegram');
+        if (!isInitialized) return;
+
+        // Если не в Telegram, но в dev режиме - продолжаем
+        if (!webApp?.initData && !devMode) {
+          setLoading(false);
+          return;
         }
 
-        await loginWithTelegram(webApp.initData);
+        // В Telegram или dev режиме
+        if (webApp?.initData) {
+          await loginWithTelegram(webApp.initData);
+        }
+        
         await loadData();
       } catch (e: any) {
         setError(e.message);
@@ -179,11 +189,13 @@ const App = () => {
     };
 
     initApp();
-  }, [webApp, loadData]);
+  }, [webApp, loadData, isInitialized, devMode]);
 
   useEffect(() => {
-    loadData();
-  }, [tokensChanged, loadData]);
+    if (isInitialized && (webApp?.initData || devMode)) {
+      loadData();
+    }
+  }, [tokensChanged, loadData, isInitialized, webApp, devMode]);
 
   const handleTokenReceive = useCallback(async (tokenObj: any) => {
     if (!tokenObj?.token_id) return;
@@ -217,11 +229,31 @@ const App = () => {
     setSelectedAmount(selected?.amount || null);
   }, [tokens]);
 
+  if (!isInitialized) {
+    return <LoadingScreen />;
+  }
+
   if (loading) return <LoadingScreen />;
   if (error) return <ErrorScreen message={error} />;
 
+  // Если не в Telegram и не в dev режиме
+  if (!webApp?.initData && !devMode) {
+    return (
+      <div className="app-error">
+        <h2>Откройте приложение через Telegram</h2>
+        <p>Для тестирования в браузере:</p>
+        <button 
+          onClick={() => setDevMode(true)}
+          className="dev-mode-button"
+        >
+          Продолжить в dev-режиме
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="app">
+    <div className={`app ${webApp ? 'tg-theme' : ''}`}>
       <PinSetup />
       
       <section className="wallet-section">
