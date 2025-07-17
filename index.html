@@ -4,69 +4,82 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ScreenFree Mini-App</title>
-  
-  <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   
-  <!-- Проверка поддержки аудио -->
+  <!-- Глобальные проверки -->
   <script>
-    window.isAudioSupported = !!(window.AudioContext || window.webkitAudioContext);
-    window.isGetUserMediaSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    window.audioContextFixApplied = false;
+    window.isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    window.isTelegram = navigator.userAgent.includes('Telegram');
   </script>
-  
-  <!-- Подключаем Quiet.js ассеты -->
+
+  <!-- Quiet.js с улучшенной инициализацией -->
   <script src="/quiet/quiet.js"></script>
   <script>
-    // Инициализация Quiet.js
-    if (window.isAudioSupported) {
-      Quiet.init({
-        profilesPrefix: "/quiet/",
-        memoryInitializerPrefix: "/quiet/"
-      });
+    function initQuiet() {
+      try {
+        Quiet.init({
+          profilesPrefix: "/quiet/",
+          memoryInitializerPrefix: "/quiet/",
+          memoryInitializer: "/quiet/quiet-emscripten.js"
+        });
+        console.log("Quiet.js initialized");
+      } catch (e) {
+        console.error("Quiet init error:", e);
+      }
+    }
+    
+    if (!window.isIOS) {
+      initQuiet();
     }
   </script>
-  <script async src="/quiet/quiet-emscripten.js"></script>
 </head>
 <body>
   <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
   
-  <!-- iOS WebView hack -->
+  <!-- iOS-specific initialization -->
   <script>
-    // Активация аудиоконтекста по первому клику (требование Safari)
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      document.addEventListener('click', () => {
+    if (window.isIOS) {
+      // Активация аудио через пользовательское взаимодействие
+      const activateAudio = () => {
+        if (window.audioContextFixApplied) return;
+        
         try {
-          const context = new (window.AudioContext || window.webkitAudioContext)();
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          const context = new AudioContext();
           if (context.state === 'suspended') {
             context.resume().then(() => {
-              console.log('AudioContext activated for iOS');
+              console.log("AudioContext activated on iOS");
             });
           }
+          
+          // iOS WebView hack
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.srcdoc = `
+            <script src="/quiet/quiet.js"><\/script>
+            <script>
+              Quiet.init({
+                profilesPrefix: "/quiet/",
+                memoryInitializerPrefix: "/quiet/"
+              });
+              parent.postMessage('quiet-loaded', '*');
+            <\/script>
+          `;
+          document.body.appendChild(iframe);
+          
+          window.audioContextFixApplied = true;
         } catch (e) {
-          console.error('AudioContext activation error:', e);
+          console.error("iOS audio activation failed:", e);
         }
-      }, { once: true, passive: true });
-    }
+      };
 
-    // Инициализация Quiet.js через iframe для iOS WebView
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.srcdoc = `
-        <script src="/quiet/quiet.js"><\/script>
-        <script>
-          if (window.isAudioSupported) {
-            Quiet.init({
-              profilesPrefix: "/quiet/",
-              memoryInitializerPrefix: "/quiet/"
-            });
-            parent.postMessage('quiet-loaded', '*');
-          }
-        <\/script>
-      `;
-      document.body.appendChild(iframe);
+      // Активируем по любому взаимодействию
+      document.addEventListener('click', activateAudio, { once: true });
+      document.addEventListener('touchstart', activateAudio, { once: true });
     }
   </script>
+  
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
