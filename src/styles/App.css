@@ -1,5 +1,8 @@
+@import './Components/Utilities.css';
+@import './Components/Forms.css';
+
 :root {
-  /* Цветовая схема */
+  /* Цветовая схема (светлая тема по умолчанию) */
   --primary: #1976d2;
   --primary-dark: #0d47a1;
   --primary-light: #e3f2fd;
@@ -45,6 +48,25 @@
   --transition-slow: 0.5s;
 }
 
+/* Темная тема */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-main: #121212;
+    --bg-card: #1e1e1e;
+    --bg-element: #2d2d2d;
+    
+    --text-primary: rgba(255, 255, 255, 0.87);
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    
+    --border-light: rgba(255, 255, 255, 0.12);
+    --border-medium: rgba(255, 255, 255, 0.24);
+    
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.25);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.35);
+  }
+}
+
 /* Базовые стили */
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -58,13 +80,15 @@ body {
 }
 
 /* Контейнер приложения */
-.app-container {
+.app {
   max-width: 100%;
   width: 100%;
   min-height: 100vh;
   margin: 0 auto;
   padding: var(--space-md);
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Общие стили для секций */
@@ -81,7 +105,7 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
-.section-title {
+.section h2 {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--primary);
@@ -90,6 +114,118 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+}
+
+/* Специфичные стили для компонентов */
+.wallet-section,
+.tokens-section,
+.history-section {
+  margin-bottom: var(--space-lg);
+}
+
+.balance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.balance-card {
+  background-color: var(--bg-element);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.balance-label {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: var(--space-xs);
+}
+
+.balance-amount {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.balance-amount.reserved {
+  color: var(--warning);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.history-item {
+  background-color: var(--bg-element);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  justify-content: space-between;
+}
+
+.history-item.redeemed {
+  opacity: 0.7;
+}
+
+.token-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.token-dates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  text-align: right;
+}
+
+.created-date,
+.redeemed-date {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.redeemed-date {
+  color: var(--success);
+}
+
+/* Состояния загрузки и ошибок */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: var(--space-md);
+}
+
+.error-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: var(--space-lg);
+  text-align: center;
+  gap: var(--space-md);
+}
+
+.error-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--error);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.5rem;
 }
 
 /* Анимации */
@@ -122,22 +258,6 @@ body {
   }
 }
 
-/* Адаптивные стили */
-@media (max-width: 480px) {
-  .app-container {
-    padding: var(--space-sm);
-  }
-  
-  .section {
-    padding: var(--space-md);
-    border-radius: var(--radius-md);
-  }
-  
-  .section-title {
-    font-size: 1.1rem;
-  }
-}
-
 /* Стили для Telegram WebApp */
 .tg-theme {
   background-color: var(--tg-theme-bg-color, var(--bg-main));
@@ -148,6 +268,26 @@ body {
   background-color: var(--tg-theme-secondary-bg-color, var(--bg-card));
 }
 
-.tg-theme .section-title {
+.tg-theme .section h2 {
   color: var(--tg-theme-button-color, var(--primary));
+}
+
+/* Адаптивные стили */
+@media (max-width: 768px) {
+  .app {
+    padding: var(--space-sm);
+  }
+  
+  .section {
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+  }
+  
+  .section h2 {
+    font-size: 1.1rem;
+  }
+  
+  .balance-grid {
+    grid-template-columns: 1fr;
+  }
 }
