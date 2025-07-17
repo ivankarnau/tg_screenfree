@@ -127,45 +127,47 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       setMode('error');
       return;
     }
-    
-    const hasAccess = await checkMicrophoneAccess();
-    if (!hasAccess) {
+
+    // Проверка поддержки микрофона
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatus("Ваш браузер не поддерживает микрофон.");
       setMode('error');
       return;
     }
-    
-    const audioSetupSuccess = await setupAudioAnalyser();
-    if (!audioSetupSuccess) {
-      setStatus('Ошибка настройки аудио');
-      setMode('error');
-      return;
-    }
-    
-    setHasMicAccess(true);
-    setMode('receive');
-    setStatus('Слушаем ультразвук...');
-    
-    rxRef.current = window.Quiet.receiver({
-      profile: 'ultrasonic-experimental',
-      onReceive: (buf: ArrayBuffer) => {
-        try {
-          const str = window.Quiet.ab2str(buf);
-          const data = JSON.parse(str);
-          setStatus(`Токен получен: ${data.amount}₽`);
-          setMode('done');
-          rxRef.current?.destroy();
-          onSuccess?.(data);
-        } catch (err) {
-          setStatus("Ошибка декодирования");
-          setMode('error');
-          rxRef.current?.destroy();
-        }
-      },
-      onCreateFail: (err: any) => {
-        setStatus(`Ошибка приемника: ${err}`);
-        setMode('error');
+
+    try {
+      // Запрос доступа к микрофону
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (stream.getAudioTracks().length === 0) {
+        throw new Error("Микрофон не активирован.");
       }
-    });
+
+      // Настройка аудиоанализатора
+      const audioSetupSuccess = await setupAudioAnalyser();
+      if (!audioSetupSuccess) {
+        throw new Error("Ошибка настройки аудио.");
+      }
+
+      setHasMicAccess(true);
+      setMode('receive');
+      setStatus('Слушаем ультразвук...');
+
+      // Создание приемника Quiet.js
+      rxRef.current = window.Quiet.receiver({
+        profile: 'ultrasonic-experimental',
+        onReceive: (buf: ArrayBuffer) => {
+          // Обработка полученных данных
+        },
+        onCreateFail: (err: any) => {
+          setStatus(`Ошибка приемника: ${err}`);
+          setMode('error');
+        }
+      });
+
+    } catch (err) {
+      setStatus(`Ошибка: ${err.message}`);
+      setMode('error');
+    }
   };
 
   const stopAll = () => {
