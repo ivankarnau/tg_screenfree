@@ -8,57 +8,48 @@
   <!-- Telegram Web-App API -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-  <!-- 1) Библиотека libquiet, скомпилированная Emscripten-ом.
-         Именно она экспортирует intArrayFromString и другие
-         runtime-методы, которых не хватало.                    -->
-  <script src="/quiet/quiet-emscripten.js"></script>
-
-  <!-- 2) Обёртка Quiet.js поверх libquiet -->
+  <!-- 1) quiet.js (биндинги + объект Module) -->
   <script src="/quiet/quiet.js"></script>
+
+  <!-- 2) libquiet, скомпилированная Emscripten-ом (рантайм + wasm)  -->
+  <script async src="/quiet/quiet-emscripten.js"></script>
 
   <!-- Глобальные флаги -->
   <script>
-    window.audioContextFixApplied = false;
     window.isIOS      = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     window.isTelegram = navigator.userAgent.includes('Telegram');
   </script>
 
-  <!-- Единая инициализация Quiet.js + подстраховка runtime -->
+  <!-- Единая инициализация Quiet.js -->
   <script>
     function initQuiet () {
-      try {
-        /* базовая инициализация */
-        Quiet.init({
-          profilesPrefix:        "/quiet/",
-          memoryInitializerPrefix: "/quiet/"
-        });
-
-        /* после загрузки патчим, если рантайм вдруг не экспортировал
-           intArrayFromString (актуально для свежих версий Emscripten) */
-        Quiet.addReadyCallback(
-          () => {
-            if (typeof Module !== 'undefined' &&
-                typeof Module.intArrayFromString !== 'function') {
-              Module.intArrayFromString = function (str) {
-                const arr = new Uint8Array(str.length + 1);
-                for (let i = 0; i < str.length; i++) arr[i] = str.charCodeAt(i);
-                arr[str.length] = 0;    /* null-terminator */
-                return arr;
-              };
-              console.log('[Quiet] patched missing Module.intArrayFromString');
-            }
-            console.log('[Quiet] ready');
-          },
-          (e) => console.error('[Quiet] init error', e)
-        );
-      } catch (e) {
-        console.error('[Quiet] unexpected error', e);
-      }
+      Quiet.init({
+        profilesPrefix:          "/quiet/",
+        memoryInitializerPrefix: "/quiet/",
+        onReady () {
+          /* подстраховка на случай кастомной сборки libquiet */
+          if (typeof Module.intArrayFromString !== 'function') {
+            Module.intArrayFromString = function (str) {
+              const arr = new Uint8Array(str.length + 1);
+              for (let i = 0; i < str.length; i++) arr[i] = str.charCodeAt(i);
+              arr[str.length] = 0;
+              return arr;
+            };
+            console.warn('[Quiet] patched missing intArrayFromString');
+          }
+          console.log('[Quiet] ready');
+        },
+        onError (e) {
+          console.error('[Quiet] init failed:', e);
+        }
+      });
     }
 
-    /* для Android/desktop запускаем сразу,
-       для iOS ждём пользовательского тапа (Web-Audio политика Safari) */
-    if (!window.isIOS) {
+    /* На iOS ждём первого тапа, чтобы разблокировать Web-Audio */
+    if (window.isIOS) {
+      const unlock = () => { initQuiet(); window.removeEventListener('touchstart', unlock); };
+      window.addEventListener('touchstart', unlock, { once: true });
+    } else {
       initQuiet();
     }
   </script>
@@ -66,43 +57,6 @@
 
 <body>
   <div id="root"></div>
-
-  <!-- iOS: активация аудио + подгрузка Quiet в скрытом iframe -->
-  <script>
-    if (window.isIOS) {
-      const activateAudio = () => {
-        if (window.audioContextFixApplied) return;
-        try {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          const ctx = new AudioContext();
-          if (ctx.state === 'suspended') ctx.resume();
-
-          /* грузим libquiet + quiet.js внутри iframe,
-             чтобы обойти ограничения Web-View Telegram */
-          const iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          iframe.srcdoc = `
-            <script src="/quiet/quiet-emscripten.js"><\/script>
-            <script src="/quiet/quiet.js"><\/script>
-            <script>parent.postMessage('quiet-loaded','*');<\/script>
-          `;
-          document.body.appendChild(iframe);
-
-          window.audioContextFixApplied = true;
-        } catch (e) {
-          console.error('[Quiet] iOS audio activation failed', e);
-        }
-      };
-
-      document.addEventListener('click',      activateAudio, { once: true });
-      document.addEventListener('touchstart', activateAudio, { once: true });
-
-      /* когда iframe сообщит, что Quiet загружен — инициализируем */
-      window.addEventListener('message', (ev) => {
-        if (ev.data === 'quiet-loaded') initQuiet();
-      });
-    }
-  </script>
 
   <!-- React-приложение -->
   <script type="module" src="/src/main.tsx"></script>
