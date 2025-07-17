@@ -1,49 +1,16 @@
 import { useEffect, useState, useCallback } from 'react';
+import { WebApp } from '@twa-dev/types';
 
 declare global {
   interface Window {
     Telegram: {
-      WebApp: {
-        initData: string;
-        initDataUnsafe: {
-          user?: {
-            id: number;
-            first_name?: string;
-            last_name?: string;
-            username?: string;
-            language_code?: string;
-          };
-        };
-        ready: () => void;
-        expand: () => void;
-        MainButton: {
-          show: () => void;
-          hide: () => void;
-          setText: (text: string) => void;
-          onClick: (callback: () => void) => void;
-          offClick: (callback: () => void) => void;
-          showProgress: (show: boolean) => void;
-          isVisible: boolean;
-          text: string;
-        };
-        requestPermission: (permission: string) => Promise<boolean>;
-        showPopup: (params: { 
-          title: string; 
-          message: string; 
-          buttons?: { id: string; type: 'default' | 'ok' | 'close' | 'destructive'; text: string }[] 
-        }) => Promise<{ button_id: string | null }>;
-        close: () => void;
-        onEvent: (event: string, handler: () => void) => void;
-        offEvent: (event: string, handler: () => void) => void;
-        themeParams: Record<string, string>;
-        backgroundColor: string;
-      };
+      WebApp: WebApp;
     };
     Quiet: {
       init: (options: { profilesPrefix: string; memoryInitializerPrefix: string }) => void;
       addReadyCallback: (success: () => void, error: (e: any) => void) => void;
       transmitter: (options: any) => any;
-      receiver: (options: any) => any;
+      receiver: (options: any) => void;
       str2ab: (str: string) => ArrayBuffer;
       ab2str: (buf: ArrayBuffer) => string;
     };
@@ -54,7 +21,7 @@ declare global {
  * Полный хук для работы с Telegram WebApp
  */
 export function useTelegram() {
-  const [webApp, setWebApp] = useState<typeof window.Telegram.WebApp | null>(null);
+  const [webApp, setWebApp] = useState<WebApp | null>(null);
   const [isIos, setIsIos] = useState(false);
 
   // Инициализация WebApp и проверка платформы
@@ -68,9 +35,6 @@ export function useTelegram() {
     setIsIos(/iPhone|iPad|iPod/i.test(navigator.userAgent));
   }, []);
 
-  /**
-   * Хук для основной кнопки с улучшенной типизацией
-   */
   const useMainButton = (
     onClick: () => void,
     options?: {
@@ -101,17 +65,12 @@ export function useTelegram() {
     }, [webApp, onClick, options]);
   };
 
-  /**
-   * Улучшенный хук для запроса разрешений с обработкой ошибок
-   */
   const useRequestPermission = (permission: 'microphone' | 'camera' | 'geolocation') => {
     const request = useCallback(async () => {
       if (!webApp || !isIos) return false;
       
       try {
-        const granted = await webApp.requestPermission(permission);
-        console.log(`${permission} permission:`, granted);
-        return granted;
+        return await webApp.requestPermission(permission);
       } catch (error) {
         console.error(`Permission error:`, error);
         return false;
@@ -121,14 +80,10 @@ export function useTelegram() {
     return { request };
   };
 
-  /**
-   * Хук для работы с Quiet.js с обработкой состояния
-   */
   const useQuiet = () => {
     const [isQuietReady, setIsQuietReady] = useState(false);
     const [quietError, setQuietError] = useState<string | null>(null);
 
-    // Инициализация Quiet.js
     useEffect(() => {
       if (!window.Quiet || isQuietReady) return;
 
@@ -143,13 +98,11 @@ export function useTelegram() {
       );
     }, [isQuietReady]);
 
-    // Для iOS: обработка iframe
     useEffect(() => {
       if (!isIos) return;
 
       const handleMessage = (e: MessageEvent) => {
         if (e.data === 'quiet-loaded') {
-          console.log('Quiet.js loaded in iframe');
           setIsQuietReady(true);
         }
       };
@@ -161,9 +114,6 @@ export function useTelegram() {
     return { isQuietReady, quietError };
   };
 
-  /**
-   * Показ всплывающего окна с обработкой результата
-   */
   const showPopup = useCallback(async (params: {
     title: string;
     message: string;
@@ -172,7 +122,7 @@ export function useTelegram() {
     if (!webApp) return null;
     
     try {
-      const result = await webApp.showPopup({
+      return await webApp.showPopup({
         title: params.title,
         message: params.message,
         buttons: params.buttons?.map(b => ({
@@ -181,19 +131,14 @@ export function useTelegram() {
           text: b.text
         }))
       });
-      return result;
     } catch (error) {
       console.error('Popup error:', error);
       return null;
     }
   }, [webApp]);
 
-  /**
-   * Закрытие мини-аппа с обработкой
-   */
   const closeApp = useCallback(() => {
-    if (!webApp) return;
-    webApp.close();
+    webApp?.close();
   }, [webApp]);
 
   return {
@@ -212,4 +157,4 @@ export function useTelegram() {
 /**
  * Алиас для обратной совместимости
  */
-export const useEffect as useTelegramEffect } = useEffect;
+export const useTelegramEffect = useEffect;
