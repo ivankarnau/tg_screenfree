@@ -6,6 +6,7 @@ import { IssueTokenForm } from './components/IssueTokenForm'
 import { TokenList } from './components/TokenList'
 import { SonicTransfer } from './components/SonicTransfer'
 import './App.css'
+import { useEffect as useTelegramEffect } from './hooks/useTelegram'
 
 // --- PIN-код ---
 function PinSetup() {
@@ -100,6 +101,25 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [tokens, setTokens] = useState<any[]>([])
   const [tokensChanged, setTokensChanged] = useState(0)
+
+  useTelegramEffect(() => {
+    const tg = window.Telegram.WebApp;
+    
+    // Для iOS: запрашиваем разрешение при монтировании
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      tg.requestPermission('microphone');
+    }
+
+    // Обработчик сообщений от iframe с Quiet.js
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data === 'quiet-loaded') {
+        console.log('Quiet.js loaded in iframe');
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   useEffect(() => {
     ; (async () => {

@@ -20,5 +20,41 @@
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
+  
+  <!-- iOS WebView hack -->
+  <script>
+    // Активация аудиоконтекста по первому клику (требование Safari)
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      document.addEventListener('click', () => {
+        try {
+          const context = new (window.AudioContext || window.webkitAudioContext)();
+          if (context.state === 'suspended') {
+            context.resume().then(() => {
+              setTimeout(() => context.close(), 500);
+            });
+          }
+        } catch (e) {
+          console.log('AudioContext activation error:', e);
+        }
+      }, { once: true, passive: true });
+    }
+
+    // Инициализация Quiet.js через iframe для iOS WebView
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.srcdoc = `
+        <script src="/quiet/quiet.js"><\/script>
+        <script>
+          Quiet.init({
+            profilesPrefix: "/quiet/",
+            memoryInitializerPrefix: "/quiet/"
+          });
+          parent.postMessage('quiet-loaded', '*');
+        <\/script>
+      `;
+      document.body.appendChild(iframe);
+    }
+  </script>
 </body>
 </html>

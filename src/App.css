@@ -13,12 +13,14 @@ body {
   background: var(--bg);
   color: #222;
 }
+
 .App {
   max-width: 430px;
   margin: 0 auto;
   padding: 22px 8px 38px 8px;
   min-height: 100vh;
 }
+
 .card {
   background: var(--card);
   border-radius: var(--radius);
@@ -27,6 +29,7 @@ body {
   box-shadow: var(--shadow);
   transition: box-shadow .15s;
 }
+
 .card h2 {
   font-size: 1.16em;
   margin-bottom: 11px;
@@ -34,6 +37,7 @@ body {
   font-weight: 600;
   letter-spacing: .02em;
 }
+
 input, .input {
   border: 1px solid var(--gray);
   border-radius: 8px;
@@ -41,10 +45,12 @@ input, .input {
   padding: 8px 11px;
   margin-right: 8px;
 }
+
 input:focus, .input:focus {
   border-color: var(--main);
   outline: none;
 }
+
 .button, button {
   background: var(--main);
   color: #fff;
@@ -57,16 +63,22 @@ input:focus, .input:focus {
   font-weight: 500;
   transition: background .15s;
 }
+
 .button:disabled, button:disabled {
   background: #b0b7c3;
   cursor: default;
 }
+
 .button:hover:not(:disabled), button:hover:not(:disabled) {
   background: var(--accent);
 }
+
 .tokens {
-  margin: 0; padding: 0; list-style: none;
+  margin: 0; 
+  padding: 0; 
+  list-style: none;
 }
+
 .tokens li {
   background: #f3f7fa;
   border-radius: 8px;
@@ -75,25 +87,42 @@ input:focus, .input:focus {
   cursor: pointer;
   transition: background .1s, border .1s;
 }
+
 .tokens li[style*="border"] {
   background: #e3f2fd;
   border: 2px solid var(--main);
 }
+
 .tokens li[style*="not-allowed"] {
   background: #efefef;
   color: #999;
   cursor: not-allowed;
 }
-.sonic-controls { display: flex; gap: 10px; margin-bottom: 12px;}
-.info { margin-top: 8px; color: #607d8b; }
-.info.error { color: #d32f2f; }
-input[type="password"] { letter-spacing: .28em; }
-@media (max-width:480px) {
-  .App { padding: 8px 2px 20px 2px; }
-  .card { padding: 14px 6px 11px 6px; }
+
+.sonic-controls { 
+  display: flex; 
+  gap: 10px; 
+  margin-bottom: 12px;
 }
 
+.info { 
+  margin-top: 8px; 
+  color: #607d8b; 
+}
 
+.info.error { 
+  color: #d32f2f; 
+}
+
+.info.success {
+  color: #4CAF50;
+}
+
+input[type="password"] { 
+  letter-spacing: .28em; 
+}
+
+/* Стили для ультразвукового модуля */
 .sonic {
   position: relative;
 }
@@ -113,9 +142,29 @@ input[type="password"] { letter-spacing: .28em; }
   transition: width 0.1s ease;
 }
 
-.sonic-status {
-  margin: 10px 0;
-  padding: 8px;
-  border-radius: 4px;
-  background: #f8f8f8;
+.ios-warning {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 15px;
+  padding: 10px;
+  background: #fff9e6;
+  border-radius: 8px;
+}
+
+.ios-warning ul {
+  padding-left: 20px;
+  margin: 5px 0 0 0;
+}
+
+/* Адаптивные стили */
+@media (max-width:480px) {
+  .App { 
+    padding: 8px 2px 20px 2px; 
+  }
+  .card { 
+    padding: 14px 6px 11px 6px; 
+  }
+  .sonic-controls {
+    flex-direction: column;
+  }
 }
