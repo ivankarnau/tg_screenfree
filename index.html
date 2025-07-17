@@ -1,72 +1,87 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ScreenFree Mini-App</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScreenFree Mini-App</title>
 
-  <!-- Telegram WebApp API -->
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-  <!-- Флаги -->
-  <script>
-    window.isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    window.isTelegram = navigator.userAgent.includes('Telegram');
-  </script>
+    <script>
+      window.isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      window.isTelegram = navigator.userAgent.includes('Telegram');
+    </script>
 
-  <!-- Quiet.js и Emscripten (загружаются в iframe на iOS) -->
-  <script>
-    function initQuietDirect() {
-      Quiet.init({
-        profilesPrefix: "/quiet/",
-        memoryInitializerPrefix: "/quiet/"
-      });
-      Quiet.addReadyCallback(
-        () => window.postMessage('quiet-ready', '*'),
-        (e) => console.error('[Quiet] error', e)
-      );
-    }
+    <!-- Quiet: основной скрипт (создаёт объект Quiet и Module) -->
+    <script src="/quiet/quiet.js"></script>
 
-    if (!window.isIOS) {
-      const script1 = document.createElement('script');
-      script1.src = "/quiet/quiet.js";
-      script1.onload = () => {
-        const script2 = document.createElement('script');
-        script2.src = "/quiet/quiet-emscripten.js";
-        script2.onload = initQuietDirect;
-        document.head.appendChild(script2);
-      };
-      document.head.appendChild(script1);
-    }
-  </script>
-</head>
-<body>
-  <div id="root"></div>
+    <!-- Quiet: рантайм Emscripten, должен быть async -->
+    <script async src="/quiet/quiet-emscripten.js"></script>
 
-  <!-- iOS: загрузка Quiet через iframe -->
-  <script>
-    if (window.isIOS) {
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.srcdoc = `
-        <script src="/quiet/quiet.js"><\/script>
-        <script src="/quiet/quiet-emscripten.js"><\/script>
-        <script>
-          Quiet.init({
-            profilesPrefix: "/quiet/",
-            memoryInitializerPrefix: "/quiet/"
-          });
-          Quiet.addReadyCallback(
-            () => parent.postMessage('quiet-ready', '*'),
-            (e) => parent.postMessage('quiet-failed:' + e, '*')
-          );
-        <\/script>
-      `;
-      document.body.appendChild(iframe);
-    }
-  </script>
+    <!-- Инициализация Quiet и postMessage в React -->
+    <script>
+      function initQuietModule() {
+        if (!window.Quiet || !window.Quiet.init) {
+          setTimeout(initQuietModule, 100);
+          return;
+        }
 
-  <!-- React -->
-  <script type="module" src="/src/main.tsx"></script>
-</body>
+        Quiet.init({
+          profilesPrefix: '/quiet/',
+          memoryInitializerPrefix: '/quiet/'
+        });
+
+        Quiet.addReadyCallback(
+          () => {
+            console.log('[Quiet] ready');
+            window.postMessage('quiet-ready', '*');
+          },
+          (e) => {
+            console.error('[Quiet] init error', e);
+            window.postMessage('quiet-failed:' + e, '*');
+          }
+        );
+      }
+
+      if (window.isIOS) {
+        // Загружаем через iframe (iOS Safari WebView ограничивает AudioContext)
+        window.addEventListener('touchstart', () => {
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.srcdoc = `
+            <script src="/quiet/quiet.js"><\/script>
+            <script src="/quiet/quiet-emscripten.js"><\/script>
+            <script>
+              function tryInit() {
+                if (!window.Quiet || !Quiet.init) {
+                  setTimeout(tryInit, 100);
+                  return;
+                }
+                Quiet.init({
+                  profilesPrefix: '/quiet/',
+                  memoryInitializerPrefix: '/quiet/'
+                });
+                Quiet.addReadyCallback(
+                  () => parent.postMessage('quiet-ready', '*'),
+                  (e) => parent.postMessage('quiet-failed:' + e, '*')
+                );
+              }
+              tryInit();
+            <\/script>
+          `;
+          document.body.appendChild(iframe);
+        }, { once: true });
+      } else {
+        // Обычные браузеры — инициализация напрямую
+        window.addEventListener('load', () => {
+          initQuietModule();
+        });
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
