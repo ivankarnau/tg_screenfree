@@ -12,13 +12,10 @@
       window.isTelegram = navigator.userAgent.includes('Telegram');
     </script>
 
-    <!-- Quiet: основной скрипт (создаёт объект Quiet и Module) -->
+    <!-- Quiet.js и wasm -->
     <script src="/quiet/quiet.js"></script>
-
-    <!-- Quiet: рантайм Emscripten, должен быть async -->
     <script async src="/quiet/quiet-emscripten.js"></script>
 
-    <!-- Инициализация Quiet и postMessage в React -->
     <script>
       function initQuietModule() {
         if (!window.Quiet || !window.Quiet.init) {
@@ -28,7 +25,7 @@
 
         Quiet.init({
           profilesPrefix: '/quiet/',
-          memoryInitializerPrefix: '/quiet/'
+          memoryInitializerPrefixURL: '/quiet/'  // <--- исправлено
         });
 
         Quiet.addReadyCallback(
@@ -44,7 +41,6 @@
       }
 
       if (window.isIOS) {
-        // Загружаем через iframe (iOS Safari WebView ограничивает AudioContext)
         window.addEventListener('touchstart', () => {
           const iframe = document.createElement('iframe');
           iframe.style.display = 'none';
@@ -59,7 +55,7 @@
                 }
                 Quiet.init({
                   profilesPrefix: '/quiet/',
-                  memoryInitializerPrefix: '/quiet/'
+                  memoryInitializerPrefixURL: '/quiet/'
                 });
                 Quiet.addReadyCallback(
                   () => parent.postMessage('quiet-ready', '*'),
@@ -72,7 +68,6 @@
           document.body.appendChild(iframe);
         }, { once: true });
       } else {
-        // Обычные браузеры — инициализация напрямую
         window.addEventListener('load', () => {
           initQuietModule();
         });

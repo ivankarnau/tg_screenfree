@@ -12,7 +12,7 @@ import '../styles/Components/SonicTransfer.css';
 declare global {
   interface Window {
     Quiet: {
-      init: (opt: { profilesPrefix: string; memoryInitializerPrefix: string }) => void;
+      init: (opt: { profilesPrefix: string; memoryInitializerPrefixURL: string }) => void;
       addReadyCallback: (ok: () => void, fail: (e: any) => void) => void;
       transmitter: (opt: any) => any;
       receiver: (opt: any) => any;
@@ -51,8 +51,8 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   useEffect(() => {
     const handle = (e: MessageEvent) => {
       if (e.data === 'quiet-ready') {
-        console.log('[Quiet] ready from iframe or main');
         setIsQuietReady(true);
+        console.log('[Quiet] ready from iframe or main');
       } else if (typeof e.data === 'string' && e.data.startsWith('quiet-failed')) {
         console.error('[Quiet] init failed', e.data);
       }
@@ -64,8 +64,8 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   useEffect(() => {
     const tick = () => {
       if (window.Quiet && typeof window.Quiet.transmitter === 'function') {
-        console.log('[Quiet] detected directly');
         setIsQuietReady(true);
+        console.log('[Quiet] detected directly');
       } else {
         setTimeout(tick, 300);
       }
@@ -109,7 +109,6 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       txRef.current = window.Quiet.transmitter({
         profile: 'ultrasonic',
         onFinish: () => {
-          console.log('[Quiet] передача завершена');
           setMode('done');
           setStatus('Передача завершена');
           onSuccess?.();
@@ -123,7 +122,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
         amount: Number(amount),
         ts: Date.now()
       });
-      console.log('[Quiet] transmit:', payload);
+      console.log('[TX] payload:', payload);
       txRef.current.transmit(window.Quiet.str2ab(payload));
     } catch (e: any) {
       console.error('[Quiet] TX error', e);
@@ -182,7 +181,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
         onReceive: (ab: ArrayBuffer) => {
           try {
             const str = window.Quiet.ab2str(ab);
-            console.log('[Quiet] получено:', str);
+            console.log('[RX] raw:', str);
             const data = JSON.parse(str);
             if (data.token_id && data.amount) {
               setMode('done');
@@ -205,10 +204,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       console.error('[Quiet] RX error', e);
       setMode('error');
       setStatus('Ошибка приёма');
-      showPopup({
-        title: 'Ошибка приёма',
-        message: window.isIOS ? 'Проверьте разрешение на микрофон' : e?.message || 'Не удалось получить токен'
-      });
+      showPopup({ title: 'Ошибка приёма', message: e?.message || 'Не удалось получить токен' });
       cleanup();
     }
   }, [isQuietReady, micOK, onSuccess, ensureAudioContext, showPopup]);
@@ -219,7 +215,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     rxRef.current?.destroy();
 
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => { });
+      audioContextRef.current.close().catch(() => {});
     }
     audioContextRef.current = null;
 
@@ -255,74 +251,41 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   return (
     <div className="sonic-transfer">
       <h2>Ультразвуковая передача</h2>
-
       <div className="sonic-transfer-controls">
         {mode === 'idle' && (
           <>
-            <button
-              className="sonic-button primary"
-              onClick={transmit}
-              disabled={!tokenId || typeof amount !== 'number'}
-            >
+            <button className="sonic-button primary" onClick={transmit} disabled={!tokenId || typeof amount !== 'number'}>
               📤 Передать токен
             </button>
-            <button
-              className="sonic-button secondary"
-              onClick={receive}
-              disabled={!micOK}
-            >
+            <button className="sonic-button secondary" onClick={receive} disabled={!micOK}>
               📥 Получить токен
             </button>
           </>
         )}
-
         {(mode === 'send' || mode === 'receive') && (
           <div className="sonic-transfer-active">
             <div className="sonic-status">{status}</div>
-
             {mode === 'receive' && (
               <div className="sonic-volume">
-                <div
-                  className="sonic-volume-level"
-                  style={{ width: `${volumeLevel}%` }}
-                />
+                <div className="sonic-volume-level" style={{ width: `${volumeLevel}%` }} />
               </div>
             )}
-
-            <button
-              className="sonic-button cancel"
-              onClick={cleanup}
-            >
-              Отмена
-            </button>
+            <button className="sonic-button cancel" onClick={cleanup}>Отмена</button>
           </div>
         )}
-
         {mode === 'done' && (
           <div className="sonic-transfer-result">
             <div className="sonic-status success">{status}</div>
-            <button
-              className="sonic-button"
-              onClick={cleanup}
-            >
-              Готово
-            </button>
+            <button className="sonic-button" onClick={cleanup}>Готово</button>
           </div>
         )}
-
         {mode === 'error' && (
           <div className="sonic-transfer-error">
             <div className="sonic-status error">{status}</div>
-            <button
-              className="sonic-button"
-              onClick={cleanup}
-            >
-              Понятно
-            </button>
+            <button className="sonic-button" onClick={cleanup}>Понятно</button>
           </div>
         )}
       </div>
-
       {window.isIOS && (
         <div className="sonic-ios-hint">
           ⚠️ Для работы:<br />
