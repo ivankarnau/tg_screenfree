@@ -1,262 +1,311 @@
-import React, { useEffect, useState } from 'react'
-import { loginWithTelegram } from './api/auth'
-import { apiFetch } from './api/client'
-import { TopUpForm } from './components/TopUpForm'
-import { IssueTokenForm } from './components/IssueTokenForm'
-import { TokenList } from './components/TokenList'
-import { SonicTransfer } from './components/SonicTransfer'
-import './App.css'
-import { useEffect as useTelegramEffect } from './hooks/useTelegram'
+import React, { useState, useEffect, useCallback } from 'react';
+import { loginWithTelegram } from './api/auth';
+import { apiFetch } from './api/client';
+import { TopUpForm } from './components/TopUpForm';
+import { IssueTokenForm } from './components/IssueTokenForm';
+import { TokenList } from './components/TokenList';
+import { SonicTransfer } from './components/SonicTransfer';
+import { useTelegram } from './hooks/useTelegram';
+import './styles/App.css';
 
-// --- PIN-код ---
-function PinSetup() {
-  const [pin, setPin] = React.useState('')
-  const [mode, setMode] = React.useState<'set' | 'locked' | 'change'>('set')
-  const [confirm, setConfirm] = React.useState('')
-  const [oldPin, setOldPin] = React.useState('')
+// --- Компонент настройки PIN-кода ---
+const PinSetup = () => {
+  const [pin, setPin] = useState('');
+  const [mode, setMode] = useState<'set' | 'locked' | 'change'>('set');
+  const [confirm, setConfirm] = useState('');
+  const [oldPin, setOldPin] = useState('');
 
   useEffect(() => {
-    const stored = localStorage.getItem('user_pin')
-    if (stored) setMode('locked')
-  }, [])
+    const stored = localStorage.getItem('user_pin');
+    if (stored) setMode('locked');
+  }, []);
 
-  function savePin() {
-    if (!/^\d{4}$/.test(pin)) return alert("Пин-код должен быть 4 цифры")
-    if (mode === 'set' && pin !== confirm) return alert("Пин-коды не совпадают")
-    localStorage.setItem('user_pin', pin)
-    setMode('locked')
-    setPin('')
-    setConfirm('')
-    setOldPin('')
-    alert("Пин-код сохранён")
-  }
+  const handlePinChange = (value: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
+    setter(value.replace(/\D/g, '').slice(0, 4));
+  };
 
-  function requestChange() {
-    setMode('change')
-    setOldPin('')
-    setPin('')
-    setConfirm('')
-  }
+  const savePin = () => {
+    if (!/^\d{4}$/.test(pin)) {
+      alert("Пин-код должен быть 4 цифры");
+      return;
+    }
+    if (mode === 'set' && pin !== confirm) {
+      alert("Пин-коды не совпадают");
+      return;
+    }
+    
+    localStorage.setItem('user_pin', pin);
+    setMode('locked');
+    setPin('');
+    setConfirm('');
+    setOldPin('');
+    alert("Пин-код сохранён");
+  };
 
-  function confirmChange() {
-    const stored = localStorage.getItem('user_pin') || ''
-    if (oldPin !== stored) return alert("Неверный старый PIN")
-    setMode('set')
-    setPin('')
-    setConfirm('')
-    setOldPin('')
-  }
+  const requestChange = () => {
+    setMode('change');
+    setOldPin('');
+    setPin('');
+    setConfirm('');
+  };
+
+  const confirmChange = () => {
+    const stored = localStorage.getItem('user_pin') || '';
+    if (oldPin !== stored) {
+      alert("Неверный старый PIN");
+      return;
+    }
+    setMode('set');
+    setPin('');
+    setConfirm('');
+    setOldPin('');
+  };
 
   if (mode === 'locked') {
     return (
-      <div style={{ marginBottom: 16 }}>
-        <b>PIN-код установлен.</b> <button onClick={requestChange}>Изменить PIN</button>
+      <div className="pin-status">
+        <span>PIN-код установлен</span>
+        <button className="pin-change-btn" onClick={requestChange}>
+          Изменить PIN
+        </button>
       </div>
-    )
+    );
   }
+
   if (mode === 'change') {
     return (
-      <div style={{ marginBottom: 16 }}>
-        <b>Подтвердите старый PIN:</b>
+      <div className="pin-form">
+        <label>Подтвердите старый PIN:</label>
         <input
+          type="password"
           value={oldPin}
           maxLength={4}
-          onChange={e => setOldPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+          onChange={(e) => handlePinChange(e.target.value, setOldPin)}
+          className="pin-input"
         />
-        <button onClick={confirmChange}>Далее</button>
+        <button className="pin-confirm-btn" onClick={confirmChange}>
+          Далее
+        </button>
       </div>
-    )
+    );
   }
-  // mode === 'set'
+
   return (
-    <div style={{ marginBottom: 16 }}>
-      <b>{localStorage.getItem('user_pin') ? "Новый PIN:" : "Придумайте PIN:"}</b>
-      <input
-        value={pin}
-        maxLength={4}
-        onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-        style={{ marginLeft: 8 }}
-      />
-      <input
-        type="password"
-        placeholder="Подтвердите PIN"
-        value={confirm}
-        maxLength={4}
-        onChange={e => setConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
-        style={{ marginLeft: 8 }}
-      />
-      <button onClick={savePin}>Сохранить PIN</button>
+    <div className="pin-form">
+      <label>{localStorage.getItem('user_pin') ? "Новый PIN:" : "Придумайте PIN:"}</label>
+      <div className="pin-inputs">
+        <input
+          type="password"
+          value={pin}
+          maxLength={4}
+          onChange={(e) => handlePinChange(e.target.value, setPin)}
+          className="pin-input"
+          placeholder="••••"
+        />
+        <input
+          type="password"
+          placeholder="Подтвердите"
+          value={confirm}
+          maxLength={4}
+          onChange={(e) => handlePinChange(e.target.value, setConfirm)}
+          className="pin-input"
+        />
+      </div>
+      <button className="pin-save-btn" onClick={savePin}>
+        Сохранить PIN
+      </button>
     </div>
-  )
-}
+  );
+};
 
-// --- ОСНОВНОЙ APP ---
+// --- Основной компонент приложения ---
+const App = () => {
+  const {
+    webApp,
+    isIos,
+    showPopup
+  } = useTelegram();
 
-export default function App() {
-  const [available, setAvailable] = useState<number>(0)
-  const [reserved, setReserved] = useState<number>(0)
-  const [selectedToken, setSelectedToken] = useState<string | null>(null)
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [tokens, setTokens] = useState<any[]>([])
-  const [tokensChanged, setTokensChanged] = useState(0)
+  const [available, setAvailable] = useState(0);
+  const [reserved, setReserved] = useState(0);
+  const [selectedToken, setSelectedToken] = useState<string | null>(null);
+  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tokens, setTokens] = useState<any[]>([]);
+  const [tokensChanged, setTokensChanged] = useState(0);
 
-  useTelegramEffect(() => {
-    const tg = window.Telegram.WebApp;
-    
-    // Для iOS: запрашиваем разрешение при монтировании
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      tg.requestPermission('microphone');
+  const loadData = useCallback(async () => {
+    try {
+      const [balanceRes, tokensRes] = await Promise.all([
+        apiFetch('/wallet/balance'),
+        apiFetch('/wallet/tokens')
+      ]);
+
+      if (balanceRes.ok) {
+        const { available, reserved } = await balanceRes.json();
+        setAvailable(available);
+        setReserved(reserved);
+      }
+
+      if (tokensRes.ok) {
+        const tokensData = await tokensRes.json();
+        setTokens(tokensData);
+        
+        if (selectedToken) {
+          const selected = tokensData.find(t => t.token_id === selectedToken);
+          setSelectedAmount(selected?.amount || null);
+        }
+      }
+    } catch (e: any) {
+      setError(e.message);
     }
+  }, [selectedToken]);
 
-    // Обработчик сообщений от iframe с Quiet.js
-    const handleMessage = (e: MessageEvent) => {
-      if (e.data === 'quiet-loaded') {
-        console.log('Quiet.js loaded in iframe');
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        if (!webApp?.initData) {
+          throw new Error('Откройте приложение через Telegram');
+        }
+
+        await loginWithTelegram(webApp.initData);
+        await loadData();
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
+    initApp();
+  }, [webApp, loadData]);
 
   useEffect(() => {
-    ; (async () => {
-      try {
-        const tg = window.Telegram.WebApp
-        tg.ready()
-        const initData = tg.initData
-        if (!initData) {
-          throw new Error('Нет initData от Telegram — откройте мини-приложение через кнопку бота')
-        }
-        await loginWithTelegram(initData)
-        tg.MainButton.hide()
-        await loadBalance()
-        await loadTokens()
-      } catch (e: any) {
-        setError(e.message)
-      } finally {
-        setLoading(false)
+    loadData();
+  }, [tokensChanged, loadData]);
+
+  const handleTokenReceive = useCallback(async (tokenObj: any) => {
+    if (!tokenObj?.token_id) return;
+
+    try {
+      const res = await apiFetch('/wallet/claim', {
+        method: 'POST',
+        body: JSON.stringify({ token_id: tokenObj.token_id })
+      });
+
+      if (res.ok) {
+        showPopup({
+          title: 'Успешно',
+          message: `Токен на ${tokenObj.amount}₽ зачислен!`
+        });
+        setTokensChanged(prev => prev + 1);
+      } else {
+        throw new Error('Ошибка зачисления');
       }
-    })()
-    // eslint-disable-next-line
-  }, [tokensChanged])
-
-  async function loadBalance() {
-    const res = await apiFetch('/wallet/balance')
-    if (res.ok) {
-      const data = await res.json()
-      setAvailable(data.available)
-      setReserved(data.reserved)
+    } catch (error) {
+      showPopup({
+        title: 'Ошибка',
+        message: 'Не удалось зачислить токен'
+      });
     }
-  }
+  }, [showPopup]);
 
-  async function loadTokens() {
-    const res = await apiFetch('/wallet/tokens')
-    if (res.ok) {
-      const tks = await res.json()
-      setTokens(tks)
-      if (selectedToken) {
-        const sel = tks.find((t: any) => t.token_id === selectedToken)
-        setSelectedAmount(sel ? sel.amount : null)
-      }
-    }
-  }
+  const handleTokenSelect = useCallback((id: string) => {
+    setSelectedToken(id);
+    const selected = tokens.find(t => t.token_id === id);
+    setSelectedAmount(selected?.amount || null);
+  }, [tokens]);
 
-  function reloadTokens() {
-    setTokensChanged(x => x + 1)
-    loadBalance()
-    loadTokens()
-  }
+  if (loading) return <LoadingScreen />;
+  if (error) return <ErrorScreen message={error} />;
 
-  // --- ОБРАБОТКА ПРИЁМА ТОКЕНА ЧЕРЕЗ УЛЬТРАЗВУК ---
-  async function handleTokenReceive(tokenObj: any) {
-    if (tokenObj?.token_id) {
-      try {
-        await apiFetch('/wallet/claim', {
-          method: 'POST',
-          body: JSON.stringify({ token_id: tokenObj.token_id })
-        })
-        reloadTokens()
-        alert('Токен успешно принят и зачислен на ваш баланс!')
-      } catch {
-        alert('Ошибка при зачислении токена')
-      }
-    }
-  }
-
-  return loading ? <LoadingScreen /> : error ? <ErrorScreen message={error} /> : (
-    <div className="App">
+  return (
+    <div className="app">
       <PinSetup />
-      <section className="card">
-        <h2>Кошелёк</h2>
-        <p>Доступно: <b>{available} ₽</b></p>
-        <p>Заморожено: <b>{reserved} ₽</b></p>
-        <TopUpForm onSuccess={loadBalance} />
+      
+      <section className="wallet-section">
+        <h2>Баланс кошелька</h2>
+        <div className="balance-grid">
+          <div className="balance-card">
+            <span className="balance-label">Доступно</span>
+            <span className="balance-amount">{available} ₽</span>
+          </div>
+          <div className="balance-card">
+            <span className="balance-label">Заморожено</span>
+            <span className="balance-amount reserved">{reserved} ₽</span>
+          </div>
+        </div>
+        <TopUpForm onSuccess={() => setTokensChanged(prev => prev + 1)} />
       </section>
-      <section className="card">
-        <h2>Ваши токены</h2>
-        <IssueTokenForm onSuccess={reloadTokens} />
+
+      <section className="tokens-section">
+        <h2>Мои токены</h2>
+        <IssueTokenForm onSuccess={() => setTokensChanged(prev => prev + 1)} />
         <TokenList
           selected={selectedToken}
-          onSelect={(id: string) => {
-            setSelectedToken(id)
-            const sel = tokens.find(t => t.token_id === id)
-            setSelectedAmount(sel ? sel.amount : null)
-          }}
+          onSelect={handleTokenSelect}
           tokens={tokens}
         />
       </section>
+
       <SonicTransfer
         tokenId={selectedToken}
         amount={selectedAmount}
         onSuccess={handleTokenReceive}
       />
-      <section className="card" style={{ marginTop: 32 }}>
-        <h2>История токенов</h2>
+
+      <section className="history-section">
+        <h2>История операций</h2>
         <TokenHistory tokens={tokens} />
       </section>
     </div>
-  )
-}
+  );
+};
 
-function TokenHistory({ tokens }: { tokens: any[] }) {
-  return (
-    <div>
-      <ul style={{ paddingLeft: 0, margin: 0 }}>
-        {tokens.map(t => (
-          <li key={t.token_id} style={{ marginBottom: 8, fontSize: "0.98em", listStyle: "none", borderBottom: "1px solid #eee", paddingBottom: 7 }}>
-            <span>
-              <b>{t.amount} ₽</b> — <small>{t.token_id.slice(0, 8)}…</small>
-            </span>
-            <br />
-            <small>Создан: {new Date(t.created_at).toLocaleString()}</small>
-            {t.redeemed_at && <>
-              <br />
-              <small style={{ color: "#1976d2" }}>Погашен: {new Date(t.redeemed_at).toLocaleString()}</small>
-            </>}
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
+// --- Вспомогательные компоненты ---
+const TokenHistory = ({ tokens }: { tokens: any[] }) => {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
-function LoadingScreen() {
   return (
-    <div className="App">
-      <h1 className="title">ScreenFree</h1>
-      <p className="info">Загрузка…</p>
+    <div className="history-list">
+      {tokens.map(token => (
+        <div key={token.token_id} className={`history-item ${token.redeemed_at ? 'redeemed' : ''}`}>
+          <div className="token-info">
+            <span className="token-amount">{token.amount} ₽</span>
+            <span className="token-id">{token.token_id.slice(0, 8)}...</span>
+          </div>
+          <div className="token-dates">
+            <span className="created-date">{formatDate(token.created_at)}</span>
+            {token.redeemed_at && (
+              <span className="redeemed-date">{formatDate(token.redeemed_at)}</span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
-  )
-}
+  );
+};
 
-function ErrorScreen({ message }: { message: string }) {
-  return (
-    <div className="App">
-      <h1 className="title">ScreenFree</h1>
-      <p className="info error">{message}</p>
-    </div>
-  )
-}
+const LoadingScreen = () => (
+  <div className="loading-screen">
+    <div className="loading-spinner"></div>
+    <p>Загрузка данных...</p>
+  </div>
+);
+
+const ErrorScreen = ({ message }: { message: string }) => (
+  <div className="error-screen">
+    <div className="error-icon">!</div>
+    <p className="error-message">{message}</p>
+  </div>
+);
+
+export default App;

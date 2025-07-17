@@ -1,0 +1,148 @@
+.sonic-transfer {
+  position: relative;
+  padding: var(--space-lg);
+  background-color: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.sonic-transfer-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-top: 0;
+  margin-bottom: var(--space-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sonic-transfer-icon {
+  font-size: 1.5rem;
+}
+
+.sonic-controls {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.sonic-btn {
+  flex: 1;
+  padding: var(--space-md);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.sonic-btn-primary {
+  background-color: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.sonic-btn-primary:hover {
+  background-color: var(--primary-dark);
+}
+
+.sonic-btn-secondary {
+  background-color: var(--bg-element);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.sonic-btn-secondary:hover {
+  background-color: rgba(25, 118, 210, 0.1);
+}
+
+.sonic-status {
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  text-align: center;
+  font-weight: 500;
+}
+
+.sonic-status-active {
+  background-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.sonic-status-success {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: var(--success);
+}
+
+.sonic-status-error {
+  background-color: rgba(211, 47, 47, 0.1);
+  color: var(--error);
+}
+
+.volume-meter {
+  width: 100%;
+  height: 20px;
+  background-color: var(--bg-element);
+  border-radius: 10px;
+  margin: var(--space-md) 0;
+  overflow: hidden;
+}
+
+.volume-level {
+  height: 100%;
+  background: linear-gradient(to right, var(--success), var(--warning));
+  transition: width 0.1s ease;
+}
+
+.sonic-wave {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle, rgba(25, 118, 210, 0.1) 0%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sonic-active .sonic-wave {
+  animation: sonicWave 1.5s infinite;
+}
+
+@keyframes sonicWave {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* iOS специфичные стили */
+.ios-warning {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding: var(--space-sm);
+  background-color: var(--bg-element);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-md);
+  text-align: center;
+}
+
+/* Адаптивные стили */
+@media (max-width: 480px) {
+  .sonic-controls {
+    flex-direction: column;
+  }
+  
+  .sonic-transfer {
+    padding: var(--space-md);
+  }
+}
