@@ -13,6 +13,35 @@
     window.isTelegram = navigator.userAgent.includes('Telegram');
   </script>
 
+
+<script>
+  // Проверка поддержки Web Audio API
+  window.AudioContext = window.AudioContext || window.webkitAudioContext;
+  
+  // Инициализация Quiet для iOS
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    document.addEventListener('touchstart', function initQuiet() {
+      if (!window.Quiet) return;
+      
+      Quiet.init({
+        profilesPrefix: '/quiet/',
+        memoryInitializerPrefix: '/quiet/'
+      });
+      
+      Quiet.addReadyCallback(
+        function() {
+          window.postMessage('quiet-ready', '*');
+        },
+        function(e) {
+          window.postMessage('quiet-failed:' + e, '*');
+        }
+      );
+      
+      document.removeEventListener('touchstart', initQuiet);
+    }, { once: true });
+  }
+</script>
+
   <!-- Quiet bindings -->
   <script src="/quiet/quiet.js"></script>
   <script>

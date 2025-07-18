@@ -1,112 +1,135 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Zvuk Pay – Приём</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
-  <style>
-    body{margin:0;padding:0;font-family:Inter,sans-serif;background:#0b0e11;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center}
-    h2{margin:0;font-size:1.4rem}
-    #status{margin-top:.6rem;font-size:.95rem;opacity:.8}
-    .eq{display:flex;gap:4px;margin-top:1.2rem;height:18px}
-    .bar{flex:1;background:#28d;opacity:.12;border-radius:2px;transition:.06s}
-    .bar.on{opacity:1}
-    .btn{margin-top:1.6rem;padding:.8rem 2rem;background:#28d;color:#fff;border:0;border-radius:10px;font-size:1rem}
-  </style>
-
-  <!-- Локальные файлы Quiet -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Прием токена</title>
   <script src="/quiet/quiet.js"></script>
-  <script>
-    Quiet.init({
-      profilesPrefix: "/quiet/",
-      memoryInitializerPrefix: "/quiet/"
-    });
-  </script>
-  <script async src="/quiet/quiet-emscripten.js"></script>
+  <script src="/quiet/quiet-emscripten.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .status {
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .success {
+      color: green;
+    }
+    .error {
+      color: red;
+    }
+  </style>
 </head>
 <body>
-  <h2>Получение токена…</h2>
-  <p id="status">Нажмите «Начать приём»</p>
-  <div class="eq" id="eq"></div>
-  <button id="start" class="btn">Начать приём</button>
-  <button id="back" class="btn" style="display:none">Вернуться</button>
-
+  <h1>Режим приема</h1>
+  <div id="status" class="status">Инициализация...</div>
+  <button id="startBtn" style="padding: 10px 20px; font-size: 16px;">Начать прием</button>
+  
   <script>
-    const bot = 'YOUR_BOT'; // замени на своего!
+    const statusEl = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    let receiver;
+    let isReceiving = false;
 
-    const PROFILE_NAME = 'ultrasonic15';
-    const PROFILE = {
-      mod_scheme: 'gmsk',
-      checksum_scheme: 'crc32',
-      inner_fec_scheme: 'v27',
-      outer_fec_scheme: 'none',
-      frame_length: 34,
-      modulation: { center_frequency: 15000, gain: 0.2 },
-      interpolation: {
-        shape: 'rrcos',
-        samples_per_symbol: 14,
-        symbol_delay: 4,
-        excess_bandwidth: 0.35
-      }
-    };
+    function initQuiet() {
+      Quiet.init({
+        profilesPrefix: '/quiet/',
+        memoryInitializerPrefix: '/quiet/'
+      });
 
-    const eq = document.getElementById('eq');
-    for(let i=0;i<12;i++){
-      const el=document.createElement('div'); el.className='bar'; eq.appendChild(el);
-    }
-    const bars=[...document.querySelectorAll('.bar')];
-
-    const goBack = (payload) => {
-      location.href = `tg://resolve?domain=${bot}&start=${encodeURIComponent(payload || 'done')}`;
-    };
-    document.getElementById('back').onclick = ()=>goBack('');
-
-    let started = false;
-    let rx;
-    Quiet.addReadyCallback(() => {
-      try { Quiet.addProfile(PROFILE_NAME, PROFILE); } catch {}
-      document.getElementById('start').onclick = async () => {
-        if (started) return;
-        started = true;
-        document.getElementById('status').textContent = 'Ожидание ультразвука...';
-        document.getElementById('start').disabled = true;
-        if(!navigator.mediaDevices){
-          document.getElementById('status').textContent = 'Safari/браузер заблокировал микрофон';
-          document.getElementById('back').style.display = 'inline-block'; return;
+      Quiet.addReadyCallback(
+        () => {
+          statusEl.textContent = 'Готов к приему';
+          startBtn.disabled = false;
+        },
+        (error) => {
+          statusEl.textContent = `Ошибка инициализации: ${error}`;
+          statusEl.className = 'status error';
         }
-        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-        const ctx = new (window.AudioContext||window.webkitAudioContext)();
-        const src = ctx.createMediaStreamSource(stream);
-        const ana = ctx.createAnalyser(); ana.fftSize=32; src.connect(ana);
-        const arr = new Uint8Array(ana.frequencyBinCount);
-        const paint = ()=>{ ana.getByteFrequencyData(arr);
-          const lvl = arr.reduce((s,v)=>s+v,0)/arr.length/255*12;
-          bars.forEach((b,i)=>b.classList.toggle('on', lvl>i));
-          requestAnimationFrame(paint);
-        }; paint();
+      );
+    }
 
-        rx = Quiet.receiver({
-          profile: PROFILE_NAME,
-          onReceive:ab=>{
-            try{
-              const str = Quiet.ab2str(ab);
-              document.getElementById('status').textContent='✓ Токен принят';
-              document.getElementById('back').style.display='inline-block';
-              goBack(str);
-            }catch(e){
-              document.getElementById('status').textContent='Ошибка декодирования';
-            }
-          },
-          onCreateFail:e=>{
-            document.getElementById('status').textContent='Ошибка приёма: '+e;
-            document.getElementById('back').style.display='inline-block';
-          }
-        });
+    function startReceiving() {
+      if (isReceiving) return;
+      
+      const profile = {
+        mod_scheme: 'gmsk',
+        checksum_scheme: 'crc32',
+        inner_fec_scheme: 'v27',
+        outer_fec_scheme: 'none',
+        frame_length: 34,
+        modulation: { center_frequency: 18500, gain: 0.2 },
+        interpolation: {
+          shape: 'rrcos',
+          samples_per_symbol: 14,
+          symbol_delay: 4,
+          excess_bandwidth: 0.35,
+        },
       };
-    },e=>{
-      document.getElementById('status').textContent='Quiet init error';
-      document.getElementById('back').style.display='inline-block';
+
+      Quiet.addProfile('receiver-profile', profile);
+
+      receiver = Quiet.receiver({
+        profile: 'receiver-profile',
+        onReceive: (data) => {
+          try {
+            const str = Quiet.ab2str(data);
+            const tokenData = JSON.parse(str);
+            
+            statusEl.textContent = `Получен токен: ${tokenData.amount}₽`;
+            statusEl.className = 'status success';
+            
+            // Отправляем данные обратно в мини-приложение
+            if (window.opener) {
+              window.opener.postMessage({ type: 'token-received', data: tokenData }, '*');
+            }
+            
+            // Закрываем окно через 3 секунды
+            setTimeout(() => {
+              window.close();
+            }, 3000);
+          } catch (e) {
+            statusEl.textContent = 'Ошибка декодирования токена';
+            statusEl.className = 'status error';
+          }
+        },
+        onCreateFail: (error) => {
+          statusEl.textContent = `Ошибка создания приемника: ${error}`;
+          statusEl.className = 'status error';
+        },
+        onReceiveFail: () => {
+          statusEl.textContent = 'Ошибка приема данных';
+          statusEl.className = 'status error';
+        }
+      });
+
+      isReceiving = true;
+      startBtn.textContent = 'Прием...';
+      statusEl.textContent = 'Слушаю ультразвук...';
+    }
+
+    startBtn.addEventListener('click', startReceiving);
+
+    // Инициализация для iOS
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      document.addEventListener('touchstart', initQuiet, { once: true });
+    } else {
+      initQuiet();
+    }
+
+    // Обработка закрытия
+    window.addEventListener('beforeunload', () => {
+      if (receiver) {
+        receiver.destroy();
+      }
     });
   </script>
 </body>
