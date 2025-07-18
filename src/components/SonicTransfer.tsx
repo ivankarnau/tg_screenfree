@@ -13,47 +13,76 @@ type Props = {
 export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   const { webApp, isIos, showPopup } = useTelegram();
   const [isTransmitting, setTransmitting] = useState(false);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('Инициализация аудио системы...');
   const [isQuietReady, setIsQuietReady] = useState(false);
+  const [volumeLevel, setVolumeLevel] = useState(0);
   const txRef = useRef<any>();
   const audioContextRef = useRef<AudioContext | null>(null);
+  const volumeInterval = useRef<NodeJS.Timeout>();
 
+  // Эффект для анимации уровня громкости
   useEffect(() => {
-    const handleQuietReady = () => {
-      setIsQuietReady(true);
-      setStatus('Аудио система готова');
+    if (isTransmitting) {
+      volumeInterval.current = setInterval(() => {
+        setVolumeLevel(Math.floor(Math.random() * 5) + 3);
+      }, 100);
+    } else {
+      clearInterval(volumeInterval.current);
+      setVolumeLevel(0);
+    }
+
+    return () => {
+      clearInterval(volumeInterval.current);
     };
-    
-    const handleQuietFailed = (e: any) => {
-      setStatus(`Ошибка загрузки: ${e.message || 'Неизвестная ошибка'}`);
+  }, [isTransmitting]);
+
+  // Обработчики событий Quiet
+  useEffect(() => {
+    const handleReady = () => {
+      setIsQuietReady(true);
+      setStatus('Готов к передаче');
+      console.log('Quiet ready in component');
+    };
+
+    const handleFailed = (e: any) => {
+      console.error('Quiet failed:', e);
+      setStatus('Ошибка инициализации аудио');
       showPopup({
         title: 'Ошибка аудио системы',
-        message: 'Не удалось загрузить модуль звуковой передачи'
+        message: 'Пожалуйста, перезагрузите страницу'
       });
     };
 
-    window.addEventListener('quiet-ready', handleQuietReady);
-    window.addEventListener('quiet-failed', handleQuietFailed);
+    window.addEventListener('quiet-ready', handleReady);
+    window.addEventListener('quiet-failed', handleFailed);
 
     return () => {
-      window.removeEventListener('quiet-ready', handleQuietReady);
-      window.removeEventListener('quiet-failed', handleQuietFailed);
+      window.removeEventListener('quiet-ready', handleReady);
+      window.removeEventListener('quiet-failed', handleFailed);
       if (txRef.current) {
         txRef.current.destroy();
       }
+      clearInterval(volumeInterval.current);
     };
   }, [showPopup]);
 
+  // Инициализация аудио контекста
   const initAudioContext = async () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+      return audioContextRef.current;
+    } catch (error) {
+      console.error('AudioContext error:', error);
+      throw new Error('Не удалось инициализировать аудио');
     }
-    if (audioContextRef.current.state === 'suspended') {
-      await audioContextRef.current.resume();
-    }
-    return audioContextRef.current;
   };
 
+  // Обработчик передачи токена
   const handleSendToken = async () => {
     if (!tokenId || !amount) {
       showPopup({ title: 'Ошибка', message: 'Выберите токен для передачи' });
@@ -63,7 +92,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
     if (!isQuietReady) {
       showPopup({ 
         title: 'Система не готова', 
-        message: 'Аудио модуль еще не инициализирован. Подождите немного.' 
+        message: 'Аудио модуль еще не инициализирован' 
       });
       return;
     }
@@ -72,12 +101,11 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       setTransmitting(true);
       setStatus('Подготовка передачи...');
       
-      // Инициализация аудио контекста
       await initAudioContext();
 
-      // Для iOS добавляем задержку перед началом передачи
+      // Дополнительная задержка для iOS
       if (isIos) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       txRef.current = Quiet.transmitter({
@@ -89,15 +117,15 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
         },
         onCreateFail: (e: any) => {
           console.error('Transmitter error:', e);
-          setStatus(`Ошибка: ${e.message || 'Неизвестная ошибка'}`);
+          setStatus('Ошибка создания передатчика');
           setTransmitting(false);
           showPopup({
             title: 'Ошибка передачи',
-            message: 'Не удалось инициализировать передатчик'
+            message: 'Не удалось создать передатчик звука'
           });
         },
         onTransmitFail: () => {
-          setStatus('Ошибка передачи данных');
+          setStatus('Сбой передачи');
           setTransmitting(false);
         }
       });
@@ -113,22 +141,22 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       
     } catch (error: any) {
       console.error('Transmission failed:', error);
-      setStatus(`Ошибка: ${error.message || 'Неизвестная ошибка'}`);
+      setStatus('Ошибка передачи');
       setTransmitting(false);
       showPopup({
-        title: 'Ошибка передачи',
-        message: 'Не удалось выполнить передачу данных'
+        title: 'Ошибка',
+        message: error.message || 'Не удалось выполнить передачу'
       });
     }
   };
 
+  // Открытие страницы приемника
   const handleOpenReceiver = () => {
     const RECEIVER_URL = '/receiver.html';
-    
     if (webApp?.openLink) {
-      webApp.openLink(RECEIVER_URL, { try_instant_view: true });
+      webApp.openLink(RECEIVER_URL);
     } else {
-      window.open(RECEIVER_URL, '_blank', 'noopener,noreferrer');
+      window.open(RECEIVER_URL, '_blank');
     }
   };
 
@@ -159,16 +187,29 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
           📥 Получить токен
         </button>
       </div>
-      
-      {status && (
-        <div className={`sonic-status ${
-          status.includes('Ошибка') ? 'error' : 
-          status.includes('завершена') ? 'success' : ''
-        }`}>
-          {status}
+
+      {/* Визуализатор громкости */}
+      {isTransmitting && (
+        <div className="sonic-eq">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div 
+              key={i}
+              className={`bar ${i < volumeLevel ? 'on' : ''}`}
+              style={{ height: `${(i + 1) * 3}px` }}
+            />
+          ))}
         </div>
       )}
       
+      {/* Статус */}
+      <div className={`sonic-status ${
+        status.includes('Ошибка') ? 'error' : 
+        status.includes('завершена') ? 'success' : ''
+      }`}>
+        {status}
+      </div>
+      
+      {/* Подсказка для iOS */}
       {isIos && (
         <div className="ios-hint">
           <strong>Для iOS:</strong> Увеличьте громкость до максимума и поднесите 

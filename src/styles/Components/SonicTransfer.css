@@ -1,9 +1,9 @@
-/* === SonicTransfer.css ==================================== */
 :root {
   --primary: #1976d2;
   --primary-light: #1e88e5;
   --success: #4caf50;
   --error: #e53935;
+  --warning: #ff9800;
   --bg-card: #1c1f24;
   --bg-element: #262a31;
   --text-on-primary: #fff;
@@ -16,11 +16,12 @@
 .sonic-transfer {
   position: relative;
   padding: 1.5rem;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--bg-card);
   color: #fff;
   box-shadow: var(--shadow-md);
   overflow: hidden;
+  margin: 1rem 0;
 }
 
 .sonic-title {
@@ -35,6 +36,7 @@
   gap: .75rem;
   flex-wrap: wrap;
   justify-content: center;
+  margin-bottom: 1rem;
 }
 
 .sonic-btn {
@@ -89,6 +91,11 @@
 .sonic-status.error {
   color: var(--error);
   background-color: rgba(229, 57, 53, 0.1);
+}
+
+.sonic-status.warning {
+  color: var(--warning);
+  background-color: rgba(255, 152, 0, 0.1);
 }
 
 .sonic-eq {

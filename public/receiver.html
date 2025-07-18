@@ -30,6 +30,10 @@
       color: red;
       border: 1px solid red;
     }
+    .warning {
+      color: orange;
+      border: 1px solid orange;
+    }
     button {
       padding: 12px 24px;
       font-size: 16px;
@@ -66,12 +70,37 @@
       margin: 20px 0;
       text-align: left;
     }
+    .volume-bars {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      height: 24px;
+      margin: 20px 0;
+    }
+    .volume-bar {
+      width: 8px;
+      background: #40a7e3;
+      border-radius: 4px;
+      transition: height 0.1s;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Режим приема токена</h1>
     <div id="status" class="status">Инициализация...</div>
+    
+    <div class="volume-bars" id="volumeBars" style="display: none;">
+      <div class="volume-bar"></div>
+      <div class="volume-bar"></div>
+      <div class="volume-bar"></div>
+      <div class="volume-bar"></div>
+      <div class="volume-bar"></div>
+      <div class="volume-bar"></div>
+      <div class="volume-bar"></div>
+      <div class="volume-bar"></div>
+    </div>
+    
     <button id="startBtn" disabled>
       <span id="buttonText">Загрузка системы...</span>
     </button>
@@ -117,151 +146,192 @@
       }
     };
 
-    // Инициализация Quiet
-    Quiet.init({
-      profilesPrefix: "/quiet/",
-      memoryInitializerPrefix: "/quiet/",
-      libfecPrefix: "/quiet/"
-    });
+    // Элементы интерфейса
+    const statusEl = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const buttonText = document.getElementById('buttonText');
+    const iosNotice = document.getElementById('iosNotice');
+    const volumeBars = document.getElementById('volumeBars');
+    const bars = volumeBars.querySelectorAll('.volume-bar');
+    
+    // Переменные состояния
+    let receiver;
+    let audioContext;
+    let volumeInterval;
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-    document.addEventListener('DOMContentLoaded', async function() {
-      const statusEl = document.getElementById('status');
-      const startBtn = document.getElementById('startBtn');
-      const buttonText = document.getElementById('buttonText');
-      const iosNotice = document.getElementById('iosNotice');
-      let receiver;
-      let audioContext;
-
-      // Проверка iOS
-      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isIOS) {
-        iosNotice.style.display = 'block';
-      }
-
-      // Инициализация аудио контекста
-      async function initAudioContext() {
-        try {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
-          
-          // Для iOS требуется взаимодействие пользователя
-          if (isIOS && audioContext.state === 'suspended') {
-            statusEl.textContent = 'Нажмите "Начать прием" для активации аудио';
-            return false;
-          }
-          
-          return true;
-        } catch (error) {
-          throw new Error('Ошибка инициализации аудио: ' + error.message);
-        }
-      }
-
-      // Запуск приемника
-      async function startReceiver() {
-        if (receiver) return;
+    // Инициализация аудио контекста
+    async function initAudioContext() {
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
         
-        try {
-          statusEl.textContent = 'Ожидание токена...';
-          buttonText.innerHTML = '<span class="spinner"></span> Слушаем...';
-          startBtn.disabled = true;
+        if (isIOS && audioContext.state === 'suspended') {
+          statusEl.textContent = 'Нажмите "Начать прием" для активации аудио';
+          return false;
+        }
+        
+        return true;
+      } catch (error) {
+        throw new Error('Ошибка инициализации аудио: ' + error.message);
+      }
+    }
 
-          // Активируем аудио контекст для iOS
-          if (isIOS && audioContext.state === 'suspended') {
-            await audioContext.resume();
-          }
+    // Анимация уровня громкости
+    function startVolumeAnimation() {
+      volumeBars.style.display = 'flex';
+      volumeInterval = setInterval(() => {
+        const level = Math.floor(Math.random() * 5) + 3;
+        bars.forEach((bar, i) => {
+          bar.style.height = `${(i < level ? i + 1 : 0) * 3}px`;
+        });
+      }, 100);
+    }
 
-          receiver = Quiet.receiver({
-            profile: 'ultrasonic-transfer',
-            onReceive: function(data) {
-              try {
-                const str = Quiet.ab2str(data);
-                const token = JSON.parse(str);
-                
-                statusEl.textContent = `Получен токен: ${token.amount}₽`;
-                statusEl.className = 'status success';
-                buttonText.textContent = 'Успешно!';
-                
-                // Отправляем данные в основное приложение
-                if (window.opener) {
-                  window.opener.postMessage({
-                    type: 'token-received',
-                    data: token
-                  }, '*');
-                }
-                
-                // Автозакрытие через 3 секунды
-                setTimeout(() => {
-                  if (window.Telegram?.WebApp) {
-                    Telegram.WebApp.close();
-                  } else {
-                    window.close();
-                  }
-                }, 3000);
-              } catch (e) {
-                statusEl.textContent = 'Ошибка декодирования данных';
-                statusEl.className = 'status error';
-                buttonText.textContent = 'Попробовать снова';
-                startBtn.disabled = false;
-                if (receiver) {
-                  receiver.destroy();
-                  receiver = null;
-                }
+    function stopVolumeAnimation() {
+      clearInterval(volumeInterval);
+      bars.forEach(bar => bar.style.height = '0px');
+    }
+
+    // Запуск приемника
+    async function startReceiver() {
+      if (receiver) return;
+      
+      try {
+        statusEl.textContent = 'Ожидание токена...';
+        statusEl.className = 'status warning';
+        buttonText.innerHTML = '<span class="spinner"></span> Слушаем...';
+        startBtn.disabled = true;
+        startVolumeAnimation();
+
+        // Активация аудио для iOS
+        if (isIOS && audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+
+        receiver = Quiet.receiver({
+          profile: 'ultrasonic-transfer',
+          onReceive: function(data) {
+            try {
+              const str = Quiet.ab2str(data);
+              const token = JSON.parse(str);
+              
+              statusEl.textContent = `Получен токен: ${token.amount}₽`;
+              statusEl.className = 'status success';
+              buttonText.textContent = 'Успешно!';
+              stopVolumeAnimation();
+              
+              // Отправка данных в основное приложение
+              if (window.opener) {
+                window.opener.postMessage({
+                  type: 'token-received',
+                  data: token
+                }, '*');
               }
-            },
-            onCreateFail: function(e) {
-              statusEl.textContent = 'Ошибка создания приемника: ' + e;
+              
+              // Автозакрытие через 3 секунды
+              setTimeout(() => {
+                if (window.Telegram?.WebApp) {
+                  Telegram.WebApp.close();
+                } else {
+                  window.close();
+                }
+              }, 3000);
+            } catch (e) {
+              statusEl.textContent = 'Ошибка декодирования данных';
               statusEl.className = 'status error';
               buttonText.textContent = 'Попробовать снова';
               startBtn.disabled = false;
-            },
-            onReceiveFail: function(num_fails) {
-              if (num_fails > 3) {
-                statusEl.textContent = 'Не удалось получить данные. Проверьте громкость и расстояние.';
-                statusEl.className = 'status error';
-                buttonText.textContent = 'Попробовать снова';
-                startBtn.disabled = false;
-                if (receiver) {
-                  receiver.destroy();
-                  receiver = null;
-                }
+              stopVolumeAnimation();
+              if (receiver) {
+                receiver.destroy();
+                receiver = null;
               }
             }
-          });
-        } catch (error) {
-          statusEl.textContent = 'Ошибка: ' + error.message;
-          statusEl.className = 'status error';
-          buttonText.textContent = 'Попробовать снова';
-          startBtn.disabled = false;
-        }
+          },
+          onCreateFail: function(e) {
+            statusEl.textContent = 'Ошибка создания приемника: ' + e;
+            statusEl.className = 'status error';
+            buttonText.textContent = 'Попробовать снова';
+            startBtn.disabled = false;
+            stopVolumeAnimation();
+          },
+          onReceiveFail: function(num_fails) {
+            if (num_fails > 3) {
+              statusEl.textContent = 'Не удалось получить данные. Проверьте громкость и расстояние.';
+              statusEl.className = 'status error';
+              buttonText.textContent = 'Попробовать снова';
+              startBtn.disabled = false;
+              stopVolumeAnimation();
+              if (receiver) {
+                receiver.destroy();
+                receiver = null;
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Receiver error:', error);
+        statusEl.textContent = 'Ошибка: ' + error.message;
+        statusEl.className = 'status error';
+        buttonText.textContent = 'Попробовать снова';
+        startBtn.disabled = false;
+        stopVolumeAnimation();
       }
+    }
 
-      // Обработчик кнопки
-      startBtn.addEventListener('click', startReceiver);
-
-      // Инициализация
+    // Инициализация приложения
+    async function initialize() {
       try {
         statusEl.textContent = 'Инициализация аудио системы...';
         
+        // 1. Инициализируем аудио контекст
         await initAudioContext();
         
-        // Добавляем профиль для приемника
-        Quiet.addReadyCallback(() => {
-          Quiet.addProfile('ultrasonic-transfer', PROFILE);
-          
-          statusEl.textContent = 'Готов к приему';
-          buttonText.textContent = 'Начать прием';
-          startBtn.disabled = false;
-        }, (error) => {
-          statusEl.textContent = 'Ошибка инициализации: ' + error;
-          statusEl.className = 'status error';
-          buttonText.textContent = 'Обновить страницу';
+        // 2. Инициализируем Quiet
+        Quiet.init({
+          profilesPrefix: "/quiet/",
+          memoryInitializerPrefix: "/quiet/",
+          libfecPrefix: "/quiet/"
         });
+
+        // 3. Добавляем профиль
+        await new Promise((resolve, reject) => {
+          Quiet.addReadyCallback(() => {
+            Quiet.addProfile('ultrasonic-transfer', PROFILE);
+            resolve();
+          }, reject);
+        });
+
+        statusEl.textContent = 'Готов к приему';
+        statusEl.className = 'status';
+        buttonText.textContent = 'Начать прием';
+        startBtn.disabled = false;
+
+        // Показываем подсказку для iOS
+        if (isIOS) {
+          iosNotice.style.display = 'block';
+        }
       } catch (error) {
         console.error('Initialization error:', error);
         statusEl.textContent = 'Ошибка: ' + error.message;
         statusEl.className = 'status error';
         buttonText.textContent = 'Обновить страницу';
       }
-    });
+    }
+
+    // Обработчик кнопки
+    startBtn.addEventListener('click', startReceiver);
+
+    // Запуск инициализации
+    if (isIOS) {
+      // Для iOS требуется пользовательское действие
+      document.addEventListener('click', function init() {
+        document.removeEventListener('click', init);
+        initialize();
+      }, { once: true });
+    } else {
+      initialize();
+    }
   </script>
 </body>
 </html>
