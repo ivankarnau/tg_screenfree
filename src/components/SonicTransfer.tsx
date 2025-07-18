@@ -38,7 +38,6 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       return;
     }
 
-    // Проверяем Quiet.js
     if (!(window as any).Quiet) {
       alert('Quiet.js не загружен!');
       return;
@@ -75,7 +74,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   };
 
   // --- Для открытия receiver.html ---
-  const RECEIVER_URL = '/receiver.html'; // поменяй путь если у тебя иначе
+  const RECEIVER_URL = '/receiver.html'; // путь, если receiver.html в public/!
   const handleOpenReceiver = () => {
     if (
       window.Telegram &&
