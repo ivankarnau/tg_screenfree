@@ -10,7 +10,7 @@ type Props = {
 export function SonicTransfer({ tokenId, amount }: Props) {
   // Локальный путь до receiver.html (корень фронта! меняй если путь другой)
   const RECEIVER_URL = '/receiver.html'; // или '/static/receiver.html', если у тебя Vercel
-  const TG_BOT = 'YOUR_BOT'; // замени на свой username БОТА без @
+  const TG_BOT = 'screenfree_bot'; // замени на свой username БОТА без @
 
   const openReceiverPage = () => {
     if (!tokenId || !amount) {
