@@ -8,35 +8,26 @@
   <!-- Telegram Web-App API -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+  <!-- Quiet.js -->
   <script>
     window.isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     window.isTelegram = navigator.userAgent.includes('Telegram');
     window.AudioContext = window.AudioContext || window.webkitAudioContext;
 
-    // Для iOS добавляем обработчик touchstart для активации аудио
-    if (window.isIOS) {
-      document.addEventListener('touchstart', function() {
-        // Создаем и сразу останавливаем аудио контекст для активации
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        if (ctx.state === 'suspended') {
-          ctx.resume().then(() => {
-            console.log('AudioContext activated for iOS');
-            ctx.close();
-          });
-        }
-      }, { once: true });
-    }
-  </script>
+    // Инициализация Quiet с правильными путями
+    Quiet.init({
+      profilesPrefix: "/quiet/",
+      memoryInitializerPrefix: "/quiet/",
+      libfecPrefix: "/quiet/"
+    });
 
-  <!-- Quiet.js -->
-  <script>
-    // Функция для загрузки WASM-модуля
+    // Загрузка скриптов Quiet
     function loadQuiet() {
       return new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = '/quiet/quiet.js';
         script.onload = resolve;
-        script.onerror = () => reject(new Error('Failed to load Quiet.js'));
+        script.onerror = reject;
         document.head.appendChild(script);
       });
     }
@@ -52,49 +43,39 @@
           return;
         }
 
-        // Настройка пути к WASM-модулю
-        window.Module = {
-          locateFile: function(path) {
-            if (path.endsWith('.wasm')) {
-              return '/quiet/quiet-emscripten.wasm';
+        // Добавляем профиль для ультразвуковой передачи
+        Quiet.addReadyCallback(() => {
+          Quiet.addProfile('ultrasonic-transfer', {
+            mod_scheme: 'gmsk',
+            checksum_scheme: 'crc32',
+            inner_fec_scheme: 'v27',
+            outer_fec_scheme: 'none',
+            frame_length: 40,
+            modulation: { 
+              center_frequency: 19000, 
+              gain: 0.2 
+            },
+            interpolation: {
+              shape: 'rrcos',
+              samples_per_symbol: 14,
+              symbol_delay: 4,
+              excess_bandwidth: 0.35
+            },
+            encoder_filters: {
+              dc_filter_alpha: 0.01
+            },
+            resampler: {
+              delay: 13,
+              bandwidth: 0.45,
+              attenuation: 60,
+              filter_bank_size: 64
             }
-            return '/quiet/' + path;
-          }
-        };
-
-        Quiet.init({
-          profilesPrefix: '/quiet/',
-          memoryInitializerPrefix: '/quiet/',
-          libfecPrefix: '/quiet/'
+          });
+          window.dispatchEvent(new Event('quiet-ready'));
+        }, (e) => {
+          console.error('Quiet init failed:', e);
+          window.dispatchEvent(new Event('quiet-failed'));
         });
-
-        Quiet.addReadyCallback(
-          function() {
-            console.log('Quiet.js ready');
-            Quiet.addProfile('ultrasonic-transfer', {
-              mod_scheme: 'gmsk',
-              checksum_scheme: 'crc32',
-              inner_fec_scheme: 'v27',
-              outer_fec_scheme: 'none',
-              frame_length: 34,
-              modulation: { 
-                center_frequency: 18500, 
-                gain: isIOS ? 0.3 : 0.2 // Увеличиваем громкость для iOS
-              },
-              interpolation: {
-                shape: 'rrcos',
-                samples_per_symbol: 14,
-                symbol_delay: 4,
-                excess_bandwidth: 0.35,
-              }
-            });
-            window.dispatchEvent(new Event('quiet-ready'));
-          },
-          function(e) {
-            console.error('Quiet init failed:', e);
-            window.dispatchEvent(new Event('quiet-failed'));
-          }
-        );
       } catch (error) {
         console.error('Initialization error:', error);
         window.dispatchEvent(new Event('quiet-failed'));
@@ -103,7 +84,19 @@
 
     // Для iOS требуется пользовательское действие
     if (window.isIOS) {
-      document.addEventListener('touchstart', initializeApp, { once: true });
+      document.addEventListener('touchstart', function() {
+        // Активируем аудио контекст
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(() => {
+            console.log('AudioContext activated');
+            initializeApp();
+            ctx.close();
+          });
+        } else {
+          initializeApp();
+        }
+      }, { once: true });
     } else {
       initializeApp();
     }

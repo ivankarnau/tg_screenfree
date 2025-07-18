@@ -30,10 +30,6 @@
       color: red;
       border: 1px solid red;
     }
-    .warning {
-      color: orange;
-      border: 1px solid orange;
-    }
     button {
       padding: 12px 24px;
       font-size: 16px;
@@ -48,13 +44,7 @@
     }
     button:disabled {
       background: #cccccc;
-    }
-    .ios-notice {
-      background: #fff3cd;
-      padding: 15px;
-      border-radius: 8px;
-      margin: 20px 0;
-      text-align: left;
+      cursor: not-allowed;
     }
     .spinner {
       display: inline-block;
@@ -68,6 +58,13 @@
     }
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+    .ios-notice {
+      background: #fff3cd;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      text-align: left;
     }
   </style>
 </head>
@@ -90,6 +87,7 @@
     </div>
   </div>
 
+  <script src="/quiet/quiet.js"></script>
   <script>
     // Конфигурация профиля (должна совпадать с передатчиком)
     const PROFILE = {
@@ -97,17 +95,35 @@
       checksum_scheme: 'crc32',
       inner_fec_scheme: 'v27',
       outer_fec_scheme: 'none',
-      frame_length: 34,
-      modulation: { center_frequency: 18500, gain: 0.2 },
+      frame_length: 40,
+      modulation: { 
+        center_frequency: 19000, 
+        gain: 0.2 
+      },
       interpolation: {
         shape: 'rrcos',
         samples_per_symbol: 14,
         symbol_delay: 4,
-        excess_bandwidth: 0.35,
+        excess_bandwidth: 0.35
+      },
+      encoder_filters: {
+        dc_filter_alpha: 0.01
+      },
+      resampler: {
+        delay: 13,
+        bandwidth: 0.45,
+        attenuation: 60,
+        filter_bank_size: 64
       }
     };
 
-    // Основной код
+    // Инициализация Quiet
+    Quiet.init({
+      profilesPrefix: "/quiet/",
+      memoryInitializerPrefix: "/quiet/",
+      libfecPrefix: "/quiet/"
+    });
+
     document.addEventListener('DOMContentLoaded', async function() {
       const statusEl = document.getElementById('status');
       const startBtn = document.getElementById('startBtn');
@@ -122,66 +138,20 @@
         iosNotice.style.display = 'block';
       }
 
-      // Загрузка Quiet.js
-      async function loadQuiet() {
-        return new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = '/quiet/quiet.js';
-          script.onload = resolve;
-          script.onerror = () => reject(new Error('Не удалось загрузить Quiet.js'));
-          document.head.appendChild(script);
-        });
-      }
-
       // Инициализация аудио контекста
       async function initAudioContext() {
         try {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
-          if (audioContext.state === 'suspended') {
-            await audioContext.resume();
+          
+          // Для iOS требуется взаимодействие пользователя
+          if (isIOS && audioContext.state === 'suspended') {
+            statusEl.textContent = 'Нажмите "Начать прием" для активации аудио';
+            return false;
           }
-          return audioContext;
+          
+          return true;
         } catch (error) {
           throw new Error('Ошибка инициализации аудио: ' + error.message);
-        }
-      }
-
-      // Инициализация Quiet
-      async function initializeQuiet() {
-        try {
-          await loadQuiet();
-          
-          if (!window.Quiet) {
-            throw new Error('Quiet.js не загружен');
-          }
-
-          // Настройка WASM
-          window.Module = {
-            locateFile: function(path) {
-              if (path.endsWith('.wasm')) {
-                return '/quiet/quiet-emscripten.wasm';
-              }
-              return '/quiet/' + path;
-            }
-          };
-
-          Quiet.init({
-            profilesPrefix: '/quiet/',
-            memoryInitializerPrefix: '/quiet/',
-            libfecPrefix: '/quiet/'
-          });
-
-          return new Promise((resolve, reject) => {
-            Quiet.addReadyCallback(() => {
-              Quiet.addProfile('ultrasonic-transfer', PROFILE);
-              resolve();
-            }, (error) => {
-              reject(new Error('Ошибка инициализации Quiet: ' + error));
-            });
-          });
-        } catch (error) {
-          console.error('Quiet initialization failed:', error);
-          throw error;
         }
       }
 
@@ -189,14 +159,15 @@
       async function startReceiver() {
         if (receiver) return;
         
-        statusEl.textContent = 'Ожидание токена...';
-        statusEl.className = 'status warning';
-        buttonText.innerHTML = '<span class="spinner"></span> Слушаем...';
-        startBtn.disabled = true;
-        
         try {
-          // Инициализация аудио контекста
-          await initAudioContext();
+          statusEl.textContent = 'Ожидание токена...';
+          buttonText.innerHTML = '<span class="spinner"></span> Слушаем...';
+          startBtn.disabled = true;
+
+          // Активируем аудио контекст для iOS
+          if (isIOS && audioContext.state === 'suspended') {
+            await audioContext.resume();
+          }
 
           receiver = Quiet.receiver({
             profile: 'ultrasonic-transfer',
@@ -215,10 +186,6 @@
                     type: 'token-received',
                     data: token
                   }, '*');
-                } else {
-                  // Для тестирования вне Telegram
-                  console.log('Received token:', token);
-                  alert(`Получен токен: ${token.amount}₽`);
                 }
                 
                 // Автозакрытие через 3 секунды
@@ -260,7 +227,6 @@
             }
           });
         } catch (error) {
-          console.error('Receiver error:', error);
           statusEl.textContent = 'Ошибка: ' + error.message;
           statusEl.className = 'status error';
           buttonText.textContent = 'Попробовать снова';
@@ -275,13 +241,20 @@
       try {
         statusEl.textContent = 'Инициализация аудио системы...';
         
-        await initializeQuiet();
         await initAudioContext();
         
-        statusEl.textContent = 'Готов к приему';
-        statusEl.className = 'status';
-        buttonText.textContent = 'Начать прием';
-        startBtn.disabled = false;
+        // Добавляем профиль для приемника
+        Quiet.addReadyCallback(() => {
+          Quiet.addProfile('ultrasonic-transfer', PROFILE);
+          
+          statusEl.textContent = 'Готов к приему';
+          buttonText.textContent = 'Начать прием';
+          startBtn.disabled = false;
+        }, (error) => {
+          statusEl.textContent = 'Ошибка инициализации: ' + error;
+          statusEl.className = 'status error';
+          buttonText.textContent = 'Обновить страницу';
+        });
       } catch (error) {
         console.error('Initialization error:', error);
         statusEl.textContent = 'Ошибка: ' + error.message;
