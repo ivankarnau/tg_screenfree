@@ -15,11 +15,11 @@
     .btn{margin-top:1.6rem;padding:.8rem 2rem;background:#28d;color:#fff;border:0;border-radius:10px;font-size:1rem}
   </style>
 
-  <!-- Локальные файлы Quiet — обязательно лежат в одной папке! -->
+  <!-- Локальные файлы Quiet -->
   <script src="/quiet/quiet.js"></script>
   <script>
     Quiet.init({
-      profilesPrefix: "/quiet/", // или "./quiet/" если лежит рядом
+      profilesPrefix: "/quiet/",
       memoryInitializerPrefix: "/quiet/"
     });
   </script>
@@ -27,18 +27,14 @@
 </head>
 <body>
   <h2>Получение токена…</h2>
-  <p id="status">Ожидание ультразвука</p>
+  <p id="status">Нажмите «Начать приём»</p>
   <div class="eq" id="eq"></div>
+  <button id="start" class="btn">Начать приём</button>
   <button id="back" class="btn" style="display:none">Вернуться</button>
 
   <script>
-    // --- Получаем параметры из URL
-    const qs  = new URLSearchParams(location.search);
-    const bot = qs.get('bot') ?? 'YOUR_BOT';
-    const token_id = qs.get('token_id') ?? '';
-    const amount = qs.get('amount') ?? '';
+    const bot = 'YOUR_BOT'; // замени на своего!
 
-    // --- Профиль Quiet, строго как в твоём фронте
     const PROFILE_NAME = 'ultrasonic15';
     const PROFILE = {
       mod_scheme: 'gmsk',
@@ -55,55 +51,59 @@
       }
     };
 
-    // --- Визуализация полосок эквалайзера
     const eq = document.getElementById('eq');
     for(let i=0;i<12;i++){
       const el=document.createElement('div'); el.className='bar'; eq.appendChild(el);
     }
     const bars=[...document.querySelectorAll('.bar')];
 
-    // --- Возврат в Telegram через deep-link
     const goBack = (payload) => {
       location.href = `tg://resolve?domain=${bot}&start=${encodeURIComponent(payload || 'done')}`;
     };
     document.getElementById('back').onclick = ()=>goBack('');
 
-    // --- Quiet.js ready
-    Quiet.addReadyCallback(async()=>{
-      try{ Quiet.addProfile(PROFILE_NAME, PROFILE);}catch{}
-      if(!navigator.mediaDevices){
-         document.getElementById('status').textContent='Safari/браузер заблокировал микрофон';
-         document.getElementById('back').style.display='inline-block'; return;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-      const ctx = new (window.AudioContext||window.webkitAudioContext)();
-      const src = ctx.createMediaStreamSource(stream);
-      const ana = ctx.createAnalyser(); ana.fftSize=32; src.connect(ana);
-      const arr = new Uint8Array(ana.frequencyBinCount);
-      const paint = ()=>{ ana.getByteFrequencyData(arr);
-        const lvl = arr.reduce((s,v)=>s+v,0)/arr.length/255*12;
-        bars.forEach((b,i)=>b.classList.toggle('on', lvl>i));
-        requestAnimationFrame(paint);
-      }; paint();
+    let started = false;
+    let rx;
+    Quiet.addReadyCallback(() => {
+      try { Quiet.addProfile(PROFILE_NAME, PROFILE); } catch {}
+      document.getElementById('start').onclick = async () => {
+        if (started) return;
+        started = true;
+        document.getElementById('status').textContent = 'Ожидание ультразвука...';
+        document.getElementById('start').disabled = true;
+        if(!navigator.mediaDevices){
+          document.getElementById('status').textContent = 'Safari/браузер заблокировал микрофон';
+          document.getElementById('back').style.display = 'inline-block'; return;
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const src = ctx.createMediaStreamSource(stream);
+        const ana = ctx.createAnalyser(); ana.fftSize=32; src.connect(ana);
+        const arr = new Uint8Array(ana.frequencyBinCount);
+        const paint = ()=>{ ana.getByteFrequencyData(arr);
+          const lvl = arr.reduce((s,v)=>s+v,0)/arr.length/255*12;
+          bars.forEach((b,i)=>b.classList.toggle('on', lvl>i));
+          requestAnimationFrame(paint);
+        }; paint();
 
-      // --- Приём ультразвука и возврат
-      const rx = Quiet.receiver({
-         profile: PROFILE_NAME,
-         onReceive:ab=>{
-           try{
-             const str = Quiet.ab2str(ab);
-             document.getElementById('status').textContent='✓ Токен принят';
-             document.getElementById('back').style.display='inline-block';
-             goBack(str); // авто-переход обратно в Telegram
-           }catch(e){
-             document.getElementById('status').textContent='Ошибка декодирования';
-           }
-         },
-         onCreateFail:e=>{
-           document.getElementById('status').textContent='Ошибка приёма: '+e;
-           document.getElementById('back').style.display='inline-block';
-         }
-      });
+        rx = Quiet.receiver({
+          profile: PROFILE_NAME,
+          onReceive:ab=>{
+            try{
+              const str = Quiet.ab2str(ab);
+              document.getElementById('status').textContent='✓ Токен принят';
+              document.getElementById('back').style.display='inline-block';
+              goBack(str);
+            }catch(e){
+              document.getElementById('status').textContent='Ошибка декодирования';
+            }
+          },
+          onCreateFail:e=>{
+            document.getElementById('status').textContent='Ошибка приёма: '+e;
+            document.getElementById('back').style.display='inline-block';
+          }
+        });
+      };
     },e=>{
       document.getElementById('status').textContent='Quiet init error';
       document.getElementById('back').style.display='inline-block';
