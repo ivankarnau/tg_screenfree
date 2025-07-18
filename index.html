@@ -12,6 +12,20 @@
     window.isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     window.isTelegram = navigator.userAgent.includes('Telegram');
     window.AudioContext = window.AudioContext || window.webkitAudioContext;
+
+    // Для iOS добавляем обработчик touchstart для активации аудио
+    if (window.isIOS) {
+      document.addEventListener('touchstart', function() {
+        // Создаем и сразу останавливаем аудио контекст для активации
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(() => {
+            console.log('AudioContext activated for iOS');
+            ctx.close();
+          });
+        }
+      }, { once: true });
+    }
   </script>
 
   <!-- Quiet.js -->
@@ -22,7 +36,7 @@
         const script = document.createElement('script');
         script.src = '/quiet/quiet.js';
         script.onload = resolve;
-        script.onerror = reject;
+        script.onerror = () => reject(new Error('Failed to load Quiet.js'));
         document.head.appendChild(script);
       });
     }
@@ -34,6 +48,7 @@
         
         if (!window.Quiet) {
           console.error('Quiet.js not loaded');
+          window.dispatchEvent(new Event('quiet-failed'));
           return;
         }
 
@@ -62,7 +77,10 @@
               inner_fec_scheme: 'v27',
               outer_fec_scheme: 'none',
               frame_length: 34,
-              modulation: { center_frequency: 18500, gain: 0.2 },
+              modulation: { 
+                center_frequency: 18500, 
+                gain: isIOS ? 0.3 : 0.2 // Увеличиваем громкость для iOS
+              },
               interpolation: {
                 shape: 'rrcos',
                 samples_per_symbol: 14,
@@ -79,6 +97,7 @@
         );
       } catch (error) {
         console.error('Initialization error:', error);
+        window.dispatchEvent(new Event('quiet-failed'));
       }
     }
 
