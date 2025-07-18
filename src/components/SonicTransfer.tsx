@@ -4,6 +4,12 @@ import '../styles/Components/SonicTransfer.css';
 
 const PROFILE_NAME = 'ultrasonic-transfer';
 
+type Props = {
+  tokenId: string | null;
+  amount: number | null;
+  onSuccess?: (payload?: any) => void;
+};
+
 export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   const { webApp, isIos, showPopup } = useTelegram();
   const [isTransmitting, setTransmitting] = useState(false);
@@ -12,8 +18,14 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
   const txRef = useRef<any>();
 
   useEffect(() => {
-    const handleQuietReady = () => setIsQuietReady(true);
-    const handleQuietFailed = () => setStatus('Ошибка загрузки аудио-библиотеки');
+    const handleQuietReady = () => {
+      setIsQuietReady(true);
+      setStatus('');
+    };
+    
+    const handleQuietFailed = () => {
+      setStatus('Ошибка загрузки аудио-библиотеки');
+    };
 
     window.addEventListener('quiet-ready', handleQuietReady);
     window.addEventListener('quiet-failed', handleQuietFailed);
@@ -40,11 +52,9 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       setStatus('Подготовка передачи...');
       
       // Разблокируем аудиоконтекст
-      if (window.AudioContext) {
-        const audioContext = new AudioContext();
-        if (audioContext.state === 'suspended') {
-          await audioContext.resume();
-        }
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
       }
 
       txRef.current = window.Quiet.transmitter({
@@ -80,7 +90,9 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       console.error('Transmission failed:', error);
       setStatus('Ошибка передачи');
       setTransmitting(false);
-      txRef.current?.destroy();
+      if (txRef.current) {
+        txRef.current.destroy();
+      }
     }
   };
 
@@ -99,6 +111,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       <button
         onClick={handleSendToken}
         disabled={!tokenId || isTransmitting || !isQuietReady}
+        className={!tokenId || !isQuietReady ? 'disabled' : ''}
       >
         {isTransmitting ? 'Передача...' : '📤 Передать токен'}
       </button>
@@ -108,7 +121,7 @@ export function SonicTransfer({ tokenId, amount, onSuccess }: Props) {
       
       {isIos && (
         <div className="ios-hint">
-          На iOS увеличьте громкость и поднесите устройства ближе
+          На iOS увеличьте громкость и поднесите устройства ближе (10-20 см)
         </div>
       )}
     </div>

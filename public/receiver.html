@@ -4,110 +4,190 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Прием токена</title>
-  <link rel="preload" href="/quiet/quiet-emscripten.js.mem" as="fetch" crossorigin>
-  <script src="/quiet/quiet.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .status {
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .success {
+      color: green;
+    }
+    .error {
+      color: red;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #40a7e3;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #cccccc;
+    }
+  </style>
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    // Конфигурация профиля
+    const PROFILE = {
+      mod_scheme: 'gmsk',
+      checksum_scheme: 'crc32',
+      inner_fec_scheme: 'v27',
+      outer_fec_scheme: 'none',
+      frame_length: 34,
+      modulation: { center_frequency: 18500, gain: 0.2 },
+      interpolation: {
+        shape: 'rrcos',
+        samples_per_symbol: 14,
+        symbol_delay: 4,
+        excess_bandwidth: 0.35,
+      }
+    };
+
+    // Основной код
+    document.addEventListener('DOMContentLoaded', async function() {
       const statusEl = document.getElementById('status');
       const startBtn = document.getElementById('startBtn');
       let receiver;
 
-      function initializeQuiet() {
-        if (!window.Quiet) {
-          statusEl.textContent = 'Ошибка: Quiet.js не загружен';
-          return;
-        }
-
-        Quiet.init({
-          profilesPrefix: '/quiet/',
-          memoryInitializerPrefix: '/quiet/',
-          libfecPrefix: '/quiet/'
+      // Загрузка Quiet.js
+      async function loadQuiet() {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = '/quiet/quiet.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
         });
-
-        Quiet.addReadyCallback(
-          function() {
-            // Добавляем профиль приемника
-            Quiet.addProfile('ultrasonic-receive', {
-              mod_scheme: 'gmsk',
-              checksum_scheme: 'crc32',
-              inner_fec_scheme: 'v27',
-              outer_fec_scheme: 'none',
-              frame_length: 34,
-              modulation: { center_frequency: 18500, gain: 0.2 },
-              interpolation: {
-                shape: 'rrcos',
-                samples_per_symbol: 14,
-                symbol_delay: 4,
-                excess_bandwidth: 0.35,
-              }
-            });
-            
-            statusEl.textContent = 'Готов к приему';
-            startBtn.disabled = false;
-          },
-          function(error) {
-            statusEl.textContent = 'Ошибка инициализации: ' + error;
-          }
-        );
       }
 
-      startBtn.addEventListener('click', function() {
+      // Инициализация Quiet
+      async function initializeQuiet() {
+        try {
+          await loadQuiet();
+          
+          if (!window.Quiet) {
+            throw new Error('Quiet.js not loaded');
+          }
+
+          // Настройка WASM
+          window.Module = {
+            locateFile: function(path) {
+              if (path.endsWith('.wasm')) {
+                return '/quiet/quiet-emscripten.wasm';
+              }
+              return '/quiet/' + path;
+            }
+          };
+
+          Quiet.init({
+            profilesPrefix: '/quiet/',
+            memoryInitializerPrefix: '/quiet/',
+            libfecPrefix: '/quiet/'
+          });
+
+          return new Promise((resolve, reject) => {
+            Quiet.addReadyCallback(() => {
+              Quiet.addProfile('ultrasonic-receive', PROFILE);
+              resolve();
+            }, reject);
+          });
+        } catch (error) {
+          console.error('Quiet initialization failed:', error);
+          throw error;
+        }
+      }
+
+      // Запуск приемника
+      async function startReceiver() {
         if (receiver) return;
         
         statusEl.textContent = 'Ожидание токена...';
         
-        receiver = Quiet.receiver({
-          profile: 'ultrasonic-receive',
-          onReceive: function(data) {
-            try {
-              const str = Quiet.ab2str(data);
-              const token = JSON.parse(str);
-              
-              statusEl.textContent = `Получен токен: ${token.amount}₽`;
-              statusEl.className = 'success';
-              
-              if (window.opener) {
-                window.opener.postMessage({
-                  type: 'token-received',
-                  data: token
-                }, '*');
-              }
-              
-              setTimeout(() => {
-                if (window.Telegram?.WebApp) {
-                  Telegram.WebApp.close();
-                } else {
-                  window.close();
-                }
-              }, 2000);
-            } catch (e) {
-              statusEl.textContent = 'Ошибка декодирования';
-              statusEl.className = 'error';
-            }
-          },
-          onCreateFail: function(e) {
-            statusEl.textContent = 'Ошибка создания приемника: ' + e;
-            statusEl.className = 'error';
-          },
-          onReceiveFail: function() {
-            statusEl.textContent = 'Ошибка приема данных';
-            statusEl.className = 'error';
+        try {
+          // Разблокируем аудиоконтекст
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          if (audioContext.state === 'suspended') {
+            await audioContext.resume();
           }
-        });
-      });
 
-      // Для iOS требуется пользовательское действие
-      if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        document.addEventListener('touchstart', initializeQuiet, { once: true });
-      } else {
-        initializeQuiet();
+          receiver = Quiet.receiver({
+            profile: 'ultrasonic-receive',
+            onReceive: function(data) {
+              try {
+                const str = Quiet.ab2str(data);
+                const token = JSON.parse(str);
+                
+                statusEl.textContent = `Получен токен: ${token.amount}₽`;
+                statusEl.className = 'status success';
+                
+                if (window.opener) {
+                  window.opener.postMessage({
+                    type: 'token-received',
+                    data: token
+                  }, '*');
+                }
+                
+                setTimeout(() => {
+                  if (window.Telegram?.WebApp) {
+                    Telegram.WebApp.close();
+                  } else {
+                    window.close();
+                  }
+                }, 2000);
+              } catch (e) {
+                statusEl.textContent = 'Ошибка декодирования';
+                statusEl.className = 'status error';
+              }
+            },
+            onCreateFail: function(e) {
+              statusEl.textContent = 'Ошибка создания приемника: ' + e;
+              statusEl.className = 'status error';
+            },
+            onReceiveFail: function() {
+              statusEl.textContent = 'Ошибка приема данных';
+              statusEl.className = 'status error';
+            }
+          });
+        } catch (error) {
+          console.error('Receiver error:', error);
+          statusEl.textContent = 'Ошибка: ' + error.message;
+          statusEl.className = 'status error';
+        }
+      }
+
+      // Обработчик кнопки
+      startBtn.addEventListener('click', startReceiver);
+
+      // Инициализация
+      try {
+        statusEl.textContent = 'Инициализация...';
+        startBtn.disabled = true;
+        
+        await initializeQuiet();
+        
+        statusEl.textContent = 'Готов к приему';
+        startBtn.disabled = false;
+      } catch (error) {
+        statusEl.textContent = 'Ошибка инициализации: ' + error.message;
+        statusEl.className = 'status error';
       }
     });
   </script>
 </head>
 <body>
   <h1>Режим приема токена</h1>
-  <div id="status" class="status">Инициализация...</div>
+  <div id="status" class="status">Загрузка...</div>
   <button id="startBtn" disabled>Начать прием</button>
 </body>
 </html>

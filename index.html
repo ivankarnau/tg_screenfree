@@ -9,65 +9,84 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <script>
-    // Инициализация переменных окружения
     window.isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     window.isTelegram = navigator.userAgent.includes('Telegram');
-    
-    // Проверка поддержки Web Audio API
     window.AudioContext = window.AudioContext || window.webkitAudioContext;
   </script>
 
-  <!-- Quiet.js с предварительной загрузкой WASM -->
-  <link rel="preload" href="/quiet/quiet-emscripten.js.mem" as="fetch" crossorigin>
-  <script src="/quiet/quiet.js"></script>
+  <!-- Quiet.js -->
   <script>
-    // Инициализация Quiet с обработкой ошибок
-    function initializeQuiet() {
-      if (!window.Quiet) {
-        console.error('Quiet.js not loaded');
-        return;
-      }
-
-      Quiet.init({
-        profilesPrefix: '/quiet/',
-        memoryInitializerPrefix: '/quiet/',
-        libfecPrefix: '/quiet/'
+    // Функция для загрузки WASM-модуля
+    function loadQuiet() {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = '/quiet/quiet.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
       });
-
-      Quiet.addReadyCallback(
-        function() {
-          console.log('Quiet.js ready');
-          // Добавляем профиль сразу после инициализации
-          Quiet.addProfile('ultrasonic-transfer', {
-            mod_scheme: 'gmsk',
-            checksum_scheme: 'crc32',
-            inner_fec_scheme: 'v27',
-            outer_fec_scheme: 'none',
-            frame_length: 34,
-            modulation: { center_frequency: 18500, gain: 0.2 },
-            interpolation: {
-              shape: 'rrcos',
-              samples_per_symbol: 14,
-              symbol_delay: 4,
-              excess_bandwidth: 0.35,
-            }
-          });
-          window.dispatchEvent(new Event('quiet-ready'));
-        },
-        function(e) {
-          console.error('Quiet init failed:', e);
-          window.dispatchEvent(new Event('quiet-failed'));
-        }
-      );
     }
 
-    // Для iOS требуется пользовательское взаимодействие
+    // Основная инициализация
+    async function initializeApp() {
+      try {
+        await loadQuiet();
+        
+        if (!window.Quiet) {
+          console.error('Quiet.js not loaded');
+          return;
+        }
+
+        // Настройка пути к WASM-модулю
+        window.Module = {
+          locateFile: function(path) {
+            if (path.endsWith('.wasm')) {
+              return '/quiet/quiet-emscripten.wasm';
+            }
+            return '/quiet/' + path;
+          }
+        };
+
+        Quiet.init({
+          profilesPrefix: '/quiet/',
+          memoryInitializerPrefix: '/quiet/',
+          libfecPrefix: '/quiet/'
+        });
+
+        Quiet.addReadyCallback(
+          function() {
+            console.log('Quiet.js ready');
+            Quiet.addProfile('ultrasonic-transfer', {
+              mod_scheme: 'gmsk',
+              checksum_scheme: 'crc32',
+              inner_fec_scheme: 'v27',
+              outer_fec_scheme: 'none',
+              frame_length: 34,
+              modulation: { center_frequency: 18500, gain: 0.2 },
+              interpolation: {
+                shape: 'rrcos',
+                samples_per_symbol: 14,
+                symbol_delay: 4,
+                excess_bandwidth: 0.35,
+              }
+            });
+            window.dispatchEvent(new Event('quiet-ready'));
+          },
+          function(e) {
+            console.error('Quiet init failed:', e);
+            window.dispatchEvent(new Event('quiet-failed'));
+          }
+        );
+      } catch (error) {
+        console.error('Initialization error:', error);
+      }
+    }
+
+    // Для iOS требуется пользовательское действие
     if (window.isIOS) {
-      document.addEventListener('touchstart', function() {
-        initializeQuiet();
-      }, { once: true });
+      document.addEventListener('touchstart', initializeApp, { once: true });
     } else {
-      initializeQuiet();
+      initializeApp();
     }
   </script>
 </head>
