@@ -4,85 +4,70 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>ScreenFree Mini-App</title>
-
+  
   <!-- Telegram Web-App API -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <script>
-    window.isIOS      = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    // Инициализация переменных окружения
+    window.isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     window.isTelegram = navigator.userAgent.includes('Telegram');
+    
+    // Проверка поддержки Web Audio API
+    window.AudioContext = window.AudioContext || window.webkitAudioContext;
   </script>
 
-
-<script>
-  // Проверка поддержки Web Audio API
-  window.AudioContext = window.AudioContext || window.webkitAudioContext;
-  
-  // Инициализация Quiet для iOS
-  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-    document.addEventListener('touchstart', function initQuiet() {
-      if (!window.Quiet) return;
-      
-      Quiet.init({
-        profilesPrefix: '/quiet/',
-        memoryInitializerPrefix: '/quiet/'
-      });
-      
-      Quiet.addReadyCallback(
-        function() {
-          window.postMessage('quiet-ready', '*');
-        },
-        function(e) {
-          window.postMessage('quiet-failed:' + e, '*');
-        }
-      );
-      
-      document.removeEventListener('touchstart', initQuiet);
-    }, { once: true });
-  }
-</script>
-
-  <!-- Quiet bindings -->
+  <!-- Quiet.js с предварительной загрузкой WASM -->
+  <link rel="preload" href="/quiet/quiet-emscripten.js.mem" as="fetch" crossorigin>
   <script src="/quiet/quiet.js"></script>
   <script>
-    Quiet.init({
-      profilesPrefix:          '/quiet/',
-      memoryInitializerPrefix: '/quiet/'
-    });
-
-    Quiet.addReadyCallback(
-      () => {
-        window.postMessage('quiet-ready','*');
-      },
-      (e) => {
-        window.postMessage('quiet-failed:' + e, '*');
+    // Инициализация Quiet с обработкой ошибок
+    function initializeQuiet() {
+      if (!window.Quiet) {
+        console.error('Quiet.js not loaded');
+        return;
       }
-    );
-  </script>
-  <script async src="/quiet/quiet-emscripten.js"></script>
-  <script>
+
+      Quiet.init({
+        profilesPrefix: '/quiet/',
+        memoryInitializerPrefix: '/quiet/',
+        libfecPrefix: '/quiet/'
+      });
+
+      Quiet.addReadyCallback(
+        function() {
+          console.log('Quiet.js ready');
+          // Добавляем профиль сразу после инициализации
+          Quiet.addProfile('ultrasonic-transfer', {
+            mod_scheme: 'gmsk',
+            checksum_scheme: 'crc32',
+            inner_fec_scheme: 'v27',
+            outer_fec_scheme: 'none',
+            frame_length: 34,
+            modulation: { center_frequency: 18500, gain: 0.2 },
+            interpolation: {
+              shape: 'rrcos',
+              samples_per_symbol: 14,
+              symbol_delay: 4,
+              excess_bandwidth: 0.35,
+            }
+          });
+          window.dispatchEvent(new Event('quiet-ready'));
+        },
+        function(e) {
+          console.error('Quiet init failed:', e);
+          window.dispatchEvent(new Event('quiet-failed'));
+        }
+      );
+    }
+
+    // Для iOS требуется пользовательское взаимодействие
     if (window.isIOS) {
-      const iosBootstrap = () => {
-        const frame = document.createElement('iframe');
-        frame.style.display = 'none';
-        frame.srcdoc = `
-          <script src="/quiet/quiet.js"><\/script>
-          <script>
-            Quiet.init({
-              profilesPrefix: '/quiet/',
-              memoryInitializerPrefix: '/quiet/'
-            });
-            Quiet.addReadyCallback(
-              () => parent.postMessage('quiet-ready','*'),
-              (e)=> parent.postMessage('quiet-failed:'+e,'*')
-            );
-          <\/script>
-          <script async src="/quiet/quiet-emscripten.js"><\/script>
-        `;
-        document.body.appendChild(frame);
-      };
-      window.addEventListener('touchstart', iosBootstrap, { once:true });
-      window.addEventListener('click',      iosBootstrap, { once:true });
+      document.addEventListener('touchstart', function() {
+        initializeQuiet();
+      }, { once: true });
+    } else {
+      initializeQuiet();
     }
   </script>
 </head>
