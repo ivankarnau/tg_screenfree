@@ -1,81 +1,113 @@
-<!DOCTYPE html><html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Zvuk Pay – Приём</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
-<style>
- body{margin:0;padding:0;font-family:Inter,sans-serif;background:#0b0e11;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center}
- h2{margin:0;font-size:1.4rem}
- #status{margin-top:.6rem;font-size:.95rem;opacity:.8}
- .eq{display:flex;gap:4px;margin-top:1.2rem;height:18px}
- .bar{flex:1;background:#28d;opacity:.12;border-radius:2px;transition:.06s}
- .bar.on{opacity:1}
- .btn{margin-top:1.6rem;padding:.8rem 2rem;background:#28d;color:#fff;border:0;border-radius:10px;font-size:1rem}
-</style>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Zvuk Pay – Приём</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+  <style>
+    body{margin:0;padding:0;font-family:Inter,sans-serif;background:#0b0e11;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center}
+    h2{margin:0;font-size:1.4rem}
+    #status{margin-top:.6rem;font-size:.95rem;opacity:.8}
+    .eq{display:flex;gap:4px;margin-top:1.2rem;height:18px}
+    .bar{flex:1;background:#28d;opacity:.12;border-radius:2px;transition:.06s}
+    .bar.on{opacity:1}
+    .btn{margin-top:1.6rem;padding:.8rem 2rem;background:#28d;color:#fff;border:0;border-radius:10px;font-size:1rem}
+  </style>
 
-<script src="/quiet/quiet.js"></script>
-<script>Quiet.init({profilesPrefix:"/quiet/",memoryInitializerPrefix:"/quiet/"});</script>
-<script async src="/quiet/quiet-emscripten.js"></script>
-</head><body>
-<h2>Получение токена…</h2>
-<p id="status">Ожидание ультразвука</p>
-<div class="eq" id="eq"></div>
-<button id="back" class="btn" style="display:none">Вернуться</button>
+  <!-- Локальные файлы Quiet — обязательно лежат в одной папке! -->
+  <script src="/quiet/quiet.js"></script>
+  <script>
+    Quiet.init({
+      profilesPrefix: "/quiet/", // или "./quiet/" если лежит рядом
+      memoryInitializerPrefix: "/quiet/"
+    });
+  </script>
+  <script async src="/quiet/quiet-emscripten.js"></script>
+</head>
+<body>
+  <h2>Получение токена…</h2>
+  <p id="status">Ожидание ультразвука</p>
+  <div class="eq" id="eq"></div>
+  <button id="back" class="btn" style="display:none">Вернуться</button>
 
-<script>
-/* ---------- параметры из URL ---------- */
-const qs  = new URLSearchParams(location.search);
-const bot = qs.get('bot') ?? 'YOUR_BOT';
-const PROFILE_NAME='ultrasonic15';
-const PROFILE={ /* — тот же объект, что в приложении — */ };
+  <script>
+    // --- Получаем параметры из URL
+    const qs  = new URLSearchParams(location.search);
+    const bot = qs.get('bot') ?? 'YOUR_BOT';
+    const token_id = qs.get('token_id') ?? '';
+    const amount = qs.get('amount') ?? '';
 
-/* ---------- визуализация полосок ---------- */
-const eq = document.getElementById('eq');
-for(let i=0;i<12;i++){ const el=document.createElement('div'); el.className='bar'; eq.appendChild(el); }
-const bars=[...document.querySelectorAll('.bar')];
+    // --- Профиль Quiet, строго как в твоём фронте
+    const PROFILE_NAME = 'ultrasonic15';
+    const PROFILE = {
+      mod_scheme: 'gmsk',
+      checksum_scheme: 'crc32',
+      inner_fec_scheme: 'v27',
+      outer_fec_scheme: 'none',
+      frame_length: 34,
+      modulation: { center_frequency: 15000, gain: 0.2 },
+      interpolation: {
+        shape: 'rrcos',
+        samples_per_symbol: 14,
+        symbol_delay: 4,
+        excess_bandwidth: 0.35
+      }
+    };
 
-/* ---------- возврат в Telegram ---------- */
-const goBack = (payload) =>{
-  location.href = `tg://resolve?domain=${bot}&start=${encodeURIComponent(payload||'done')}`;
-};
-document.getElementById('back').onclick = ()=>goBack('');
+    // --- Визуализация полосок эквалайзера
+    const eq = document.getElementById('eq');
+    for(let i=0;i<12;i++){
+      const el=document.createElement('div'); el.className='bar'; eq.appendChild(el);
+    }
+    const bars=[...document.querySelectorAll('.bar')];
 
-Quiet.addReadyCallback(async()=>{
-  try{ Quiet.addProfile(PROFILE_NAME,PROFILE);}catch{}
-  if(!navigator.mediaDevices){
-     document.getElementById('status').textContent='Safari заблокировал микрофон';
-     document.getElementById('back').style.display='inline-block'; return;
-  }
-  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-  const ctx = new (window.AudioContext||window.webkitAudioContext)();
-  const src = ctx.createMediaStreamSource(stream);
-  const ana = ctx.createAnalyser(); ana.fftSize=32; src.connect(ana);
-  const arr = new Uint8Array(ana.frequencyBinCount);
-  const paint = ()=>{ ana.getByteFrequencyData(arr);
-    const lvl = arr.reduce((s,v)=>s+v,0)/arr.length/255*12;
-    bars.forEach((b,i)=>b.classList.toggle('on', lvl>i));
-    requestAnimationFrame(paint);
-  }; paint();
+    // --- Возврат в Telegram через deep-link
+    const goBack = (payload) => {
+      location.href = `tg://resolve?domain=${bot}&start=${encodeURIComponent(payload || 'done')}`;
+    };
+    document.getElementById('back').onclick = ()=>goBack('');
 
-  const rx = Quiet.receiver({
-     profile:PROFILE_NAME,
-     onReceive:ab=>{
-       try{
-         const str=Quiet.ab2str(ab);
-         document.getElementById('status').textContent='✓ Токен принят';
-         document.getElementById('back').style.display='inline-block';
-         goBack(str);                        // авто-переход
-       }catch(e){
-         document.getElementById('status').textContent='Ошибка декода';
-       }
-     },
-     onCreateFail:e=>{
-       document.getElementById('status').textContent='Ошибка приёма: '+e;
-       document.getElementById('back').style.display='inline-block';
-     }
-  });
-},e=>{
-  document.getElementById('status').textContent='Quiet init error';
-  document.getElementById('back').style.display='inline-block';
-});
-</script>
-</body></html>
+    // --- Quiet.js ready
+    Quiet.addReadyCallback(async()=>{
+      try{ Quiet.addProfile(PROFILE_NAME, PROFILE);}catch{}
+      if(!navigator.mediaDevices){
+         document.getElementById('status').textContent='Safari/браузер заблокировал микрофон';
+         document.getElementById('back').style.display='inline-block'; return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const src = ctx.createMediaStreamSource(stream);
+      const ana = ctx.createAnalyser(); ana.fftSize=32; src.connect(ana);
+      const arr = new Uint8Array(ana.frequencyBinCount);
+      const paint = ()=>{ ana.getByteFrequencyData(arr);
+        const lvl = arr.reduce((s,v)=>s+v,0)/arr.length/255*12;
+        bars.forEach((b,i)=>b.classList.toggle('on', lvl>i));
+        requestAnimationFrame(paint);
+      }; paint();
+
+      // --- Приём ультразвука и возврат
+      const rx = Quiet.receiver({
+         profile: PROFILE_NAME,
+         onReceive:ab=>{
+           try{
+             const str = Quiet.ab2str(ab);
+             document.getElementById('status').textContent='✓ Токен принят';
+             document.getElementById('back').style.display='inline-block';
+             goBack(str); // авто-переход обратно в Telegram
+           }catch(e){
+             document.getElementById('status').textContent='Ошибка декодирования';
+           }
+         },
+         onCreateFail:e=>{
+           document.getElementById('status').textContent='Ошибка приёма: '+e;
+           document.getElementById('back').style.display='inline-block';
+         }
+      });
+    },e=>{
+      document.getElementById('status').textContent='Quiet init error';
+      document.getElementById('back').style.display='inline-block';
+    });
+  </script>
+</body>
+</html>

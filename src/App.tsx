@@ -43,7 +43,7 @@ const App = () => {
       if (tokensRes.ok) {
         const tokensData = await tokensRes.json();
         setTokens(tokensData);
-        
+
         if (selectedToken) {
           const selected = tokensData.find(t => t.token_id === selectedToken);
           setSelectedAmount(selected?.amount || null);
@@ -67,7 +67,7 @@ const App = () => {
         if (webApp?.initData) {
           await loginWithTelegram(webApp.initData);
         }
-        
+
         await loadData();
       } catch (e: any) {
         setError(e.message);
@@ -129,7 +129,7 @@ const App = () => {
       <div className="app-error">
         <h2>Откройте приложение через Telegram</h2>
         <p>Для тестирования в браузере:</p>
-        <button 
+        <button
           onClick={() => setDevMode(true)}
           className="dev-mode-button"
         >
@@ -142,7 +142,7 @@ const App = () => {
   return (
     <div className={`app ${webApp ? 'tg-theme' : ''}`}>
       <PinSetup />
-      
+
       <section className="wallet-section">
         <h2>Баланс кошелька</h2>
         <div className="balance-grid">
